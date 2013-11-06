@@ -1,0 +1,28 @@
+{
+  "name": "rtc-smartpeer",
+  "version": "0.0.0",
+  "description": "An experiment using state.js to assist with managing RTCPeerConnection state interaction'",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gendocs": "gendocs > README.md"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtc-io/rtc-smartpeer.git"
+  },
+  "keywords": [
+    "webrtc",
+    "rtc.io",
+    "RTCPeerConnection"
+  ],
+  "author": "Damon Oehlman <damon.oehlman@nicta.com.au>",
+  "license": "Apache 2.0",
+  "bugs": {
+    "url": "https://github.com/rtc-io/rtc-smartpeer/issues"
+  },
+  "homepage": "https://github.com/rtc-io/rtc-smartpeer",
+  "dependencies": {
+    "state": "~0.2.0"
+  }
+}
