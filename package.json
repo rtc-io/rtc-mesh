@@ -16,6 +16,16 @@
     "rtc.io",
     "RTCPeerConnection"
   ],
+  "testling": {
+    "files": "test/all.js",
+    "browsers": [
+      "firefox/23..latest",
+      "chrome/30..latest",
+      "chrome/canary",
+      "opera/14..latest",
+      "opera/next"
+    ]
+  },
   "author": "Damon Oehlman <damon.oehlman@nicta.com.au>",
   "license": "Apache 2.0",
   "bugs": {
@@ -23,6 +33,15 @@
   },
   "homepage": "https://github.com/rtc-io/rtc-smartpeer",
   "dependencies": {
-    "state": "~0.2.0"
+    "state": "~0.2.0",
+    "cog": "~0.3.1",
+    "async": "~0.2.9",
+    "uuid": "~1.4.1"
+  },
+  "devDependencies": {
+    "messenger-memory": "~0.1.1",
+    "rtc-signaller": "~0.5.0",
+    "rtc": "~0.8.1",
+    "tape": "~2.3.0"
   }
 }
