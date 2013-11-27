@@ -148,12 +148,18 @@ proto.connect = function(attr) {
 };
 
 proto.expandMesh = function(dc, targetId) {
+  var peer = this;
+
+  function ready() {
+    peer.emit('participant', dc, targetId);
+  }
+
   // if the dc ready state is open, trigger the new dc event now
   if (dc.readyState === 'open') {
-    this.emit('participant', dc, targetId);
+    ready();
   }
   else {
-    dc.onopen = this.emit.bind(this, 'participant', dc, targetId);
+    dc.onopen = ready;
   }
 }
 
