@@ -1,7 +1,7 @@
 {
   "name": "rtc-mesh",
   "version": "0.0.0",
-  "description": "An experiment using state.js to assist with managing RTCPeerConnection state interaction'",
+  "description": "A synchronized, distributed P2P mesh data structure using WebRTC data channels",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -14,7 +14,9 @@
   "keywords": [
     "webrtc",
     "rtc.io",
-    "RTCPeerConnection"
+    "mesh",
+    "scuttlebutt",
+    "p2p"
   ],
   "testling": {
     "files": "test/all.js",
