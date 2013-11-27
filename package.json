@@ -36,7 +36,9 @@
   "dependencies": {
     "cog": "~0.3.1",
     "scuttlebutt": "~5.6.8",
-    "rtc-signaller": "~0.8.0"
+    "rtc-signaller": "~0.8.1",
+    "rtc-core": "~0.5.0",
+    "async": "~0.2.9"
   },
   "devDependencies": {
     "tape": "~2.3.0",
