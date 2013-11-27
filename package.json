@@ -1,6 +1,6 @@
 {
   "name": "rtc-mesh",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A synchronized, distributed P2P mesh data structure using WebRTC data channels",
   "main": "index.js",
   "scripts": {
