@@ -13,9 +13,31 @@ var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
-function SmartPeer(data, opts) {
-  if (! (this instanceof SmartPeer)) {
-    return new SmartPeer(opts);
+/**
+  # rtc-mesh
+
+  The `rtc-mesh` module provides functionality that will enable P2P data
+  mesh to be created and kept in sync (using
+  [scuttlebutt](https://github.com/dominictarr/scuttlebutt)).
+
+  ## How it works
+
+  To be completed.
+
+  ## Usage
+
+  To be completed
+
+  ## Reference
+
+**/
+
+/**
+  ### RTCMesh(attributes, opts)
+**/
+function RTCMesh(attributes, opts) {
+  if (! (this instanceof RTCMesh)) {
+    return new RTCMesh(opts);
   }
 
   // init
@@ -40,23 +62,23 @@ function SmartPeer(data, opts) {
     'http://sig.rtc.io:50000';
 
   // announce ourselves
-  this.announce(data);
+  this.announce(attributes);
 
   this.on('dc', function(channel) {
     debug('data channel available: ' + channel.label);
   });
 }
 
-util.inherits(SmartPeer, EventEmitter);
-module.exports = SmartPeer;
-var proto = SmartPeer.prototype;
+util.inherits(RTCMesh, EventEmitter);
+module.exports = RTCMesh;
+var proto = RTCMesh.prototype;
 
 /**
   #### announce(data)
 
   Announce ourselves to the global signaller
 **/
-proto.announce = function(data) {
+proto.announce = function(attributes) {
   var peer = this;
 
   // load primus and then carry on
@@ -81,7 +103,7 @@ proto.announce = function(data) {
       peer.signaller.on('establish', peer._handleEstablish.bind(peer));
 
       // announce ourselves over the data
-      peer.signaller.announce(data);
+      peer.signaller.announce(attributes);
       peer.emit('announce');
     });
 
@@ -90,6 +112,9 @@ proto.announce = function(data) {
   });
 };
 
+/**
+  #### close()
+**/
 proto.close = function() {
   if (this.socket) {
     this.socket.end();
@@ -97,9 +122,18 @@ proto.close = function() {
   }
 };
 
-proto.connect = function(attr) {
+/**
+  #### connect(targetAttr)
+
+  Open a connection to a participant on the signalling channel that
+  matches the given attributes.  If there is not currently any peers
+  available on the signalling server that match the required target
+  attributes, then the mesh will continue to monitor for new peers that
+  match the target criteria.
+**/
+proto.connect = function(targetAttr) {
   var peer = this;
-  var match = matcher(attr);
+  var match = matcher(targetAttr);
 
   // initialise the processing queue (one at a time please)
   var q = async.queue(function(task, cb) {
@@ -122,8 +156,8 @@ proto.connect = function(attr) {
 
   function request(task, cb) {
     // go looking for a matching target
-    debug('making request for peer with attr: ', attr);
-    peer.signaller.request(attr, function(err, channel) {
+    debug('making request for peer with attr: ', targetAttr);
+    peer.signaller.request(targetAttr, function(err, channel) {
       if (err) {
         return cb(err);
       }
@@ -138,7 +172,7 @@ proto.connect = function(attr) {
 
   if (! this.socket) {
     return this.once('announce', function() {
-      peer.connect(attr, callback);
+      peer.connect(targetAttr, callback);
     });
   }
 
@@ -147,6 +181,9 @@ proto.connect = function(attr) {
   q.push({ op: request });
 };
 
+/**
+  #### expandMesh(datachannel, targetId)
+**/
 proto.expandMesh = function(dc, targetId) {
   var peer = this;
 
@@ -163,6 +200,16 @@ proto.expandMesh = function(dc, targetId) {
   }
 }
 
+/**
+  ### RTCMesh internal methods
+**/
+
+/**
+  #### _brokerConnection(targetId)
+
+  Setup an `RTCPeerConnection` between ourselves and the specified target
+  mesh endpoint (as specified by the id).
+**/
 proto._brokerConnection = function(targetId) {
   // create a pc for datachannel only traffic
   var channel = this.signaller.to(targetId);
@@ -222,6 +269,13 @@ proto._brokerConnection = function(targetId) {
   this.signaller.on('establish:fail', establishFail);
 };
 
+/**
+  #### _handleEstablish(srcId)
+
+  This is the internal handler for dealing with `/establish` commands sent
+  to this mesh endpoint.
+
+**/
 proto._handleEstablish = function(srcId) {
   var channel = this.signaller.to(srcId);
   var peer = this;
@@ -269,6 +323,13 @@ proto._handleEstablish = function(srcId) {
   channel.send('/establish:ok', this.id);
 };
 
+/**
+  #### _initPeerConnection(targetId)
+
+  Create a new `RTCPeerConnection` for the specified target id.  This method
+  also handles basic initialization of the peer connection.
+
+**/
 proto._initPeerConnection = function(targetId) {
   var candidates = [];
   var channel = this.signaller.to(targetId);

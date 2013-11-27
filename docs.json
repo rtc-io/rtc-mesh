@@ -1,5 +1,6 @@
 {
   "badges": {
+    "stability": "experimental",
     "nodeico": true,
     "testling": true
   },
