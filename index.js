@@ -45,8 +45,11 @@ function RTCMesh(attributes, opts) {
   this.socket = null;
   this.id = null;
 
-  // initialise the peers hash
-  this.peers = {};
+  // initialise the connections hash
+  this._connections = {};
+
+  // initialise the channels hash
+  this._channels = {};
 
   // initialise the data
   this.data = new Model();
@@ -188,6 +191,8 @@ proto.expandMesh = function(dc, targetId) {
   var peer = this;
 
   function ready() {
+    // update the channels hash
+    peer._channels[targetId] = dc;
     peer.emit('participant', dc, targetId);
   }
 
@@ -199,6 +204,20 @@ proto.expandMesh = function(dc, targetId) {
     dc.onopen = ready;
   }
 }
+
+/**
+  #### getChannel(targetId)
+**/
+proto.getChannel = function(targetId) {
+  return this._channels[targetId];
+};
+
+/**
+  #### getConnection(targetId)
+**/
+proto.getConnection = function(targetId) {
+  return this._connections[targetId];
+};
 
 /**
   ### RTCMesh internal methods
@@ -301,7 +320,7 @@ proto._handleEstablish = function(srcId) {
 
   debug('received establish request from source id: ' + srcId);
 
-  if (this.peers[srcId]) {
+  if (this._connections[srcId]) {
     debug('connection active to: ' + srcId + ', sending fail');
     return channel.send('/establish:fail');
   }
@@ -341,7 +360,7 @@ proto._initPeerConnection = function(targetId) {
   var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
     detect('RTCIceCandidate');
 
-  var pc = this.peers[targetId] = new RTCPeerConnection(
+  var pc = this._connections[targetId] = new RTCPeerConnection(
     // generate the config based on options provided
     defaults({}, (this.opts || {}).config, { iceServers: [] }),
 
