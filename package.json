@@ -18,6 +18,7 @@
   ],
   "testling": {
     "files": "test/all.js",
+    "server": "test/server.js",
     "browsers": [
       "firefox/23..latest",
       "chrome/30..latest",
@@ -33,15 +34,12 @@
   },
   "homepage": "https://github.com/rtc-io/rtc-smartpeer",
   "dependencies": {
-    "state": "~0.2.0",
     "cog": "~0.3.1",
-    "async": "~0.2.9",
-    "uuid": "~1.4.1"
+    "scuttlebutt": "~5.6.8",
+    "rtc-signaller": "~0.8.0"
   },
   "devDependencies": {
-    "messenger-memory": "~0.1.1",
-    "rtc-signaller": "~0.5.0",
-    "rtc": "~0.8.1",
-    "tape": "~2.3.0"
+    "tape": "~2.3.0",
+    "rtc-switchboard": "~0.4.0"
   }
 }
