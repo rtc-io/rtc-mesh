@@ -1,39 +1,36 @@
-var SmartPeer = require('../');
+var mesh = require('../');
 var test = require('tape');
 var peerA, peerB;
+var roomId = require('uuid').v4();
 
 test('create peer a', function(t) {
-  t.plan(1);
+  t.plan(2);
 
-  peerA = new SmartPeer();
-  peerA.once('announce', function() {
-    t.pass('peer announced itself to the global signaller');
+  // join the mesh
+  mesh.join(roomId, function(err, p) {
+    t.ifError(err);
+    t.ok(peerA = p, 'peer a created an online');
   });
 });
 
 test('create peer b', function(t) {
-  t.plan(1);
+  t.plan(2);
 
-  peerB = new SmartPeer();
-  peerB.once('announce', function() {
-    t.pass('peer announced itself to the global signaller');
+  // peer b join
+  mesh.join(roomId, function(err, p) {
+    t.ifError(err);
+    t.ok(peerB = p, 'peer b created and online');
   });
 });
 
-test('connect a --> b', function(t) {
+test('update peer a data, peer b get\'s update', function(t) {
+
   t.plan(1);
-  peerA.once('connected', function() {
-    t.pass('connected');
-  });
 
-  peerA.connect({ id: peerB.id });
-});
+  function handleSync() {
+    console.log(arguments);
+  }
 
-test('connect b --> a fails', function(t) {
-  t.plan(1);
-  peerB.once('connect:fail', function() {
-    t.pass('connection attempt failed as expected');
-  });
-
-  peerB.connect({ id: peerA.id });
+  peerB.set('name', 'Bob');
+  peerB.on('sync', handleSync);
 });
