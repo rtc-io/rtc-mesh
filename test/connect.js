@@ -3,6 +3,8 @@ var test = require('tape');
 var peerA, peerB;
 var roomId = require('uuid').v4();
 
+mesh.use('http://rtc.io/switchboard');
+
 test('create peer a', function(t) {
   t.plan(2);
 

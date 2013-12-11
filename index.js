@@ -2,6 +2,7 @@
 /* global location: false */
 'use strict';
 
+var defaults = require('./defaults');
 var extend = require('cog/extend');
 var SmartPeer = require('./smartpeer');
 
@@ -41,7 +42,7 @@ var join = exports.join = function(roomName, opts, callback) {
   callback = callback || function() {};
 
   // create a new peer instance
-  peer = new SmartPeer(extend({}, opts, { room: roomName }));
+  peer = new SmartPeer(extend({}, opts));
 
   // handle errors during connection
   peer.on('error', callback);
@@ -51,5 +52,19 @@ var join = exports.join = function(roomName, opts, callback) {
     peer.removeListener('error', callback);
     callback(null, peer);
   });
+
+  // announce
+  peer.announce({ room: roomName });
 };
 
+/**
+  ### use(signalhost)
+
+**/
+exports.use = function(signalhost) {
+  // update the default signal host
+  defaults.signalhost = signalhost;
+
+  // return exports for chaining
+  return exports;
+};

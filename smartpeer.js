@@ -6,7 +6,7 @@ var debug = require('cog/logger')('rtc-mesh-smartpeer');
 var defaults = require('cog/defaults');
 var detect = require('rtc-core/detect');
 var extend = require('cog/extend');
-var signaller = require('rtc-signaller');
+var sig = require('rtc-signaller');
 var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
@@ -21,11 +21,14 @@ function RTCSmartPeer(attributes, opts) {
 
   // init
   EventEmitter.call(this);
-  this.socket = null;
-  this.id = null;
 
-  // initialise the connections hash
-  this._connections = {};
+  // initialise the opts with the defaults
+  this.opts = opts = defaults({}, opts, require('./defaults'));
+
+  // initialise the socket and signaller to null
+  this.socket = null;
+  this.signaller = null;
+  this.id = null;
 
   // initialise the channels hash
   this._channels = {};
@@ -40,19 +43,8 @@ function RTCSmartPeer(attributes, opts) {
   // init internal members
   this._dc = null;
 
-  // save the opts
-  this.opts = opts;
-
-  // initialise the signalling host
-  this.signalhost = (opts || {}).signalhost || location.origin ||
-    'http://rtc.io/switchboard/';
-
-  // announce ourselves
-  this.announce(attributes);
-
-  this.on('dc', function(channel) {
-    debug('data channel available: ' + channel.label);
-  });
+  // initialise the signalling host (fall back to the origin if default not set)
+  this.signalhost = opts.signalhost || location.origin;
 }
 
 util.inherits(RTCSmartPeer, EventEmitter);
@@ -64,36 +56,40 @@ var proto = RTCSmartPeer.prototype;
 
   Announce ourselves to the global signaller
 **/
-proto.announce = function(attributes) {
+proto.announce = function(data) {
   var peer = this;
+  var socket;
 
   // load primus and then carry on
-  signaller.loadPrimus(function(err, Primus) {
+  sig.loadPrimus(this.signalhost, function(err, Primus) {
     if (err) {
       return peer.emit('error', err);
     }
 
     // create the socket
     debug('primus loaded, creating new socket to: ' + peer.signalhost);
-    peer.socket = new Primus(peer.signalhost);
+    socket = peer.socket = new Primus(peer.signalhost);
 
-    peer.socket.on('open', function() {
+    socket.once('open', function() {
       // create our internal signaller
       debug('socket to signalling server open, creating signaller');
-      peer.signaller = signaller(peer.socket);
+      var signaller = peer.signaller = sig(socket);
 
       // inherit the id of the signaller
-      peer.id = peer.signaller.id;
+      peer.id = signaller.id;
 
       // announce ourselves over the data
-      peer.signaller.announce(attributes);
+      signaller.announce(data);
+
+      // when we meet new friends, create a dc:only peer connection
+      signaller.on('peer:announce', peer._handlePeer.bind(peer));
 
       // emit the online event
       peer.emit('online');
     });
 
     // when the socket ends, trigger the close event
-    peer.socket.on('end', peer.emit.bind(peer, 'close'));
+    peer.socket.once('end', peer.emit.bind(peer, 'close'));
   });
 };
 
@@ -322,6 +318,14 @@ proto._handleEstablish = function(srcId) {
   });
 
   channel.send('/establish:ok', this.id);
+};
+
+/**
+  #### _handlePeer
+
+**/
+proto._handlePeer = function() {
+  console.log('new peer found', arguments);
 };
 
 /**
