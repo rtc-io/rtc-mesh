@@ -4,7 +4,7 @@
   "description": "A synchronized, distributed P2P mesh data structure using WebRTC data channels",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "$(npm bin)/zuul -- test/all.js",
     "gendocs": "gendocs > README.md"
   },
   "repository": {
@@ -30,11 +30,13 @@
     "rtc-signaller": "~0.12.0",
     "rtc-core": "~0.7.1",
     "async": "~0.2.9",
-    "rtc-dcstream": "~0.1.0"
+    "rtc-dcstream": "~0.2.2"
   },
   "devDependencies": {
     "tape": "~2.3.0",
     "rtc-switchboard": "~0.4.0",
-    "uuid": "~1.4.1"
+    "uuid": "~1.4.1",
+    "mocha": "~1.15.1",
+    "zuul": "~1.0.7"
   }
 }
