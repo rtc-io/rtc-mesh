@@ -3,9 +3,6 @@ var test = require('tape');
 var peerA, peerB;
 var roomId = require('uuid').v4();
 
-mesh.use('http://rtc.io/switchboard');
-require('cog/logger').enable('*');
-
 test('create peer a', function(t) {
   t.plan(2);
 
@@ -27,13 +24,13 @@ test('create peer b', function(t) {
 });
 
 test('update peer a data, peer b get\'s update', function(t) {
+  t.plan(2);
 
-  t.plan(1);
-
-  function handleSync() {
-    console.log(arguments);
+  function handleUpdate(key, value) {
+    t.equal(key, 'name', 'Got a name update');
+    t.equal(value, 'Bob', 'Name updated to Bob');
   }
 
   peerB.set('name', 'Bob');
-  peerB.on('sync', handleSync);
+  peerA.on('update', handleUpdate);
 });

@@ -1,1 +1,1 @@
-require('./connect');
+require('./update');
