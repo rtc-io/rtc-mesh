@@ -7,6 +7,7 @@ var defaults = require('cog/defaults');
 var detect = require('rtc-core/detect');
 var extend = require('cog/extend');
 var sig = require('rtc-signaller');
+var dcstream = require('rtc-dcstream');
 var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
@@ -28,7 +29,6 @@ function RTCSmartPeer(attributes, opts) {
   // initialise the socket and signaller to null
   this.socket = null;
   this.signaller = null;
-  this.id = null;
 
   // initialise the channels hash
   this._connections = {};
@@ -38,8 +38,13 @@ function RTCSmartPeer(attributes, opts) {
   this.data = new Model();
 
   // patch in the get and set methods directly into the peer
+  this.id = this.data.id;
   this.get = this.data.get.bind(this.data);
   this.set = this.data.set.bind(this.data);
+
+  // trigger update events on the smartpeer when the data changes
+  this.data.on('update', this._handleDataUpdate.bind(this));
+  this.data.on('sync', this._handleDataSync.bind(this));
 
   // init internal members
   this._dc = null;
@@ -82,10 +87,10 @@ proto.announce = function(data) {
       debug('socket to signalling server open, creating signaller');
       var signaller = peer.signaller = sig(socket);
 
-      // inherit the id of the signaller
-      peer.id = signaller.id;
+      // override the signaller id using scuttlebutt's id
+      signaller.id = peer.data.id;
 
-      // announce ourselves over the data
+      // announce ourselves with the data
       signaller.announce(data);
 
       // when we meet new friends, create a dc:only peer connection
@@ -116,13 +121,28 @@ proto.close = function() {
   #### expandMesh(targetId, dc)
 **/
 proto.expandMesh = function(targetId, dc) {
+  // create a new stream
+  var stream = dcstream(dc);
+
+  // create a new stream for scuttlebutt synchronization
+  var dataStream = this.data.createStream();
   debug('new data channel available for target: ' + targetId);
+
+  // set the dc binary type to arraybuffer
+  dc.binaryType = 'arraybuffer';
 
   // register the channel
   this._channels[targetId] = dc;
 
-  // TODO: create the stream
-}
+  stream.on('error', function(err) {
+    console.log('captured stream error: ', err.message)
+  });
+
+  // connect the stream to the data
+  // debugger;
+  stream.pipe(dataStream).pipe(stream);
+  debug('data synchronization in progress');
+};
 
 /**
   #### getChannel(targetId)
@@ -163,6 +183,21 @@ proto._handleCandidates = function(srcInfo, candidates) {
   (candidates || []).forEach(function(candidate) {
     pc.addIceCandidate(new RTCIceCandidate(candidate));
   });
+};
+
+/**
+  #### _handleDataUpdate(pairs, clock, src)
+
+  This is the event handler for the scuttlebutt `update` event.
+**/
+proto._handleDataUpdate = function(pairs, clock, src) {
+  var peer = this.signaller.peers.get(src) || this;
+
+  this.emit('update', pairs[0], pairs[1], peer);
+};
+
+proto._handleDataSync = function() {
+  console.log('synced', arguments);
 };
 
 /**
