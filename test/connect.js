@@ -4,6 +4,7 @@ var peerA, peerB;
 var roomId = require('uuid').v4();
 
 mesh.use('http://rtc.io/switchboard');
+require('cog/logger').enable('*');
 
 test('create peer a', function(t) {
   t.plan(2);

@@ -31,6 +31,7 @@ function RTCSmartPeer(attributes, opts) {
   this.id = null;
 
   // initialise the channels hash
+  this._connections = {};
   this._channels = {};
 
   // initialise the data
@@ -60,6 +61,12 @@ proto.announce = function(data) {
   var peer = this;
   var socket;
 
+  // if we already have a signaller, simply announce the new data
+  // and return
+  if (this.signaller) {
+    return this.signaller.announce(data);
+  }
+
   // load primus and then carry on
   sig.loadPrimus(this.signalhost, function(err, Primus) {
     if (err) {
@@ -83,6 +90,8 @@ proto.announce = function(data) {
 
       // when we meet new friends, create a dc:only peer connection
       signaller.on('peer:announce', peer._handlePeer.bind(peer));
+      signaller.on('mesh:sdp', peer._handleSdp.bind(peer));
+      signaller.on('mesh:candidates', peer._handleCandidates.bind(peer));
 
       // emit the online event
       peer.emit('online');
@@ -104,83 +113,15 @@ proto.close = function() {
 };
 
 /**
-  #### connect(targetAttr)
-
-  Open a connection to a participant on the signalling channel that
-  matches the given attributes.  If there is not currently any peers
-  available on the signalling server that match the required target
-  attributes, then the mesh will continue to monitor for new peers that
-  match the target criteria.
+  #### expandMesh(targetId, dc)
 **/
-proto.connect = function(targetAttr) {
-  var peer = this;
-  var match = matcher(targetAttr);
+proto.expandMesh = function(targetId, dc) {
+  debug('new data channel available for target: ' + targetId);
 
-  // initialise the processing queue (one at a time please)
-  var q = async.queue(function(task, cb) {
-    // if the task has no operation, then trigger the callback immediately
-    if (typeof task.op != 'function') {
-      return cb();
-    }
+  // register the channel
+  this._channels[targetId] = dc;
 
-    // process the task operation
-    task.op(task, cb);
-  }, 1);
-
-  function checkNewPeer(data) {
-    // check the new peer to see if it matches the requirements
-    debug('new peer announced with attr: ', data);
-    if (match(data)) {
-      q.push({ op: request });
-    }
-  }
-
-  function request(task, cb) {
-    // go looking for a matching target
-    debug('making request for peer with attr: ', targetAttr);
-    peer.signaller.request(targetAttr, function(err, channel) {
-      if (err) {
-        return cb(err);
-      }
-
-      peer.signaller.removeListener('peer:announce', checkNewPeer);
-      debug('found target peer, initializing peer connection');
-
-      // broker the connection
-      peer._brokerConnection(channel.targetId);
-    });
-  }
-
-  if (! this.socket) {
-    return this.once('announce', function() {
-      peer.connect(targetAttr, callback);
-    });
-  }
-
-  // when new peers are announced look for a match
-  this.signaller.on('peer:announce', checkNewPeer);
-  q.push({ op: request });
-};
-
-/**
-  #### expandMesh(datachannel, targetId)
-**/
-proto.expandMesh = function(dc, targetId) {
-  var peer = this;
-
-  function ready() {
-    // update the channels hash
-    peer._channels[targetId] = dc;
-    peer.emit('participant', dc, targetId);
-  }
-
-  // if the dc ready state is open, trigger the new dc event now
-  if (dc.readyState === 'open') {
-    ready();
-  }
-  else {
-    dc.onopen = ready;
-  }
+  // TODO: create the stream
 }
 
 /**
@@ -201,131 +142,77 @@ proto.getConnection = function(targetId) {
   ### RTCMesh internal methods
 **/
 
-/**
-  #### _brokerConnection(targetId)
+proto._handleCandidates = function(srcInfo, candidates) {
+  var pc = srcInfo && this._connections[srcInfo.id]
+  var retry = this._handleCandidates.bind(this, srcInfo, candidates);
+  var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
+    detect('RTCIceCandidate');
 
-  Setup an `RTCPeerConnection` between ourselves and the specified target
-  mesh endpoint (as specified by the id).
-**/
-proto._brokerConnection = function(targetId) {
-  // create a pc for datachannel only traffic
-  var channel = this.signaller.to(targetId);
-  var pc;
-  var peer = this;
-
-  // initialise session description and icecandidate objects
-  var RTCSessionDescription = (this.opts || {}).RTCSessionDescription ||
-    detect('RTCSessionDescription');
-
-  function abort(err) {
-    debug('failed brokering peerconnection: ', err);
+  // if we don't have a pc connection
+  if (! pc) {
+    return console.error('received ice candidates from an unknown peer');
   }
 
-  function establishFail() {
-    peer.emit('connect:fail');
-    removeListeners();
+  // if the peer connection does not yet have a remote description,
+  // wait until the signaling state is stable and then apply the candidates
+  if (! pc.remoteDescription) {
+    return this.once('stable', retry);
   }
 
-  function establishOK(sourceId) {
-    if (sourceId === targetId) {
-      debug('got establish:ok confirmation from: ' + sourceId);
-      removeListeners();
-
-      // create the new pc
-      pc = peer._initPeerConnection(targetId);
-
-      // create the sync flow data channel
-      peer.expandMesh(pc.createDataChannel('syncflow'), targetId);
-
-      // create the offer
-      pc.createOffer(gotOffer, abort);
-    }
-  }
-
-  function gotOffer(desc) {
-    pc.setLocalDescription(desc, function() {
-      channel.send('/broker:offer:' + peer.id, desc);
-    }, abort);
-
-    peer.signaller.once('broker:answer:' + targetId, function(desc) {
-      debug('got answer sdp from: ' + targetId);
-      pc.setRemoteDescription(new RTCSessionDescription(desc), function() {
-        debug('successfully set remote description for the offerer');
-      }, abort);
-    });
-  }
-
-  function removeListeners() {
-    peer.signaller.removeListener('establish:ok', establishOK);
-    peer.signaller.removeListener('establish:fail', establishFail);
-  }
-
-  // send the establish request
-  channel.send('/establish', this.id);
-  this.signaller.on('establish:ok', establishOK);
-  this.signaller.on('establish:fail', establishFail);
-};
-
-/**
-  #### _handleEstablish(srcId)
-
-  This is the internal handler for dealing with `/establish` commands sent
-  to this mesh endpoint.
-
-**/
-proto._handleEstablish = function(srcId) {
-  var channel = this.signaller.to(srcId);
-  var peer = this;
-  var pc;
-
-  // initialise session description and icecandidate objects
-  var RTCSessionDescription = (this.opts || {}).RTCSessionDescription ||
-    detect('RTCSessionDescription');
-
-  function abort(err) {
-    debug('failed brokering peerconnection: ', err);
-  }
-
-  function createAnswer() {
-    pc.createAnswer(gotAnswer, abort);
-  }
-
-  function gotAnswer(desc) {
-    pc.setLocalDescription(desc, function() {
-      channel.send('/broker:answer:' + peer.id, desc);
-    }, abort);
-  }
-
-  debug('received establish request from source id: ' + srcId);
-
-  if (this._connections[srcId]) {
-    debug('connection active to: ' + srcId + ', sending fail');
-    return channel.send('/establish:fail');
-  }
-
-  this.signaller.once('broker:offer:' + srcId, function(desc) {
-    debug('got offer sdp from ' + srcId);
-    pc = peer._initPeerConnection(srcId);
-    pc.ondatachannel = function(evt) {
-      peer.expandMesh(evt.channel, srcId);
-    };
-
-    pc.setRemoteDescription(
-      new RTCSessionDescription(desc),
-      createAnswer,
-      abort
-    );
+  // apply the candidates
+  (candidates || []).forEach(function(candidate) {
+    pc.addIceCandidate(new RTCIceCandidate(candidate));
   });
-
-  channel.send('/establish:ok', this.id);
 };
 
 /**
   #### _handlePeer
 
 **/
-proto._handlePeer = function() {
-  console.log('new peer found', arguments);
+proto._handlePeer = function(data) {
+  // ensure the new peer is valid
+  var validPeer = data && data.id && (! this._connections[data.id]);
+
+  if (! validPeer) {
+    return;
+  }
+
+  // create a new connection for the peer
+  debug(this.id + ' creating a new connection to ' + data.id);
+  this._connections[data.id] = this._initPeerConnection(
+    data.id,
+    this.signaller.peers.get(data.id)
+  );
+};
+
+/**
+  #### _handleSdp
+
+**/
+proto._handleSdp = function(srcInfo, desc) {
+  // initialise session description and icecandidate objects
+  var fail = this.emit.bind(this, 'error');
+  var RTCSessionDescription = (this.opts || {}).RTCSessionDescription ||
+    detect('RTCSessionDescription');
+  var pc = srcInfo && this._connections[srcInfo.id];
+  var peer = this;
+
+  // if we don't have a pc connection
+  if (! pc) {
+    return console.error('received sdp for an unknown peer');
+  }
+
+  // set the remote description of the pc
+  pc.setRemoteDescription(
+    new RTCSessionDescription(desc),
+    function() {
+      // if it was an offer, then create an answer
+      if (desc.type == 'offer') {
+        peer._negotiate(srcInfo.id, pc, pc.createAnswer);
+      }
+    },
+    fail
+  );
 };
 
 /**
@@ -335,7 +222,7 @@ proto._handlePeer = function() {
   also handles basic initialization of the peer connection.
 
 **/
-proto._initPeerConnection = function(targetId) {
+proto._initPeerConnection = function(targetId, peerData) {
   var candidates = [];
   var channel = this.signaller.to(targetId);
   var peer = this;
@@ -343,10 +230,7 @@ proto._initPeerConnection = function(targetId) {
   var RTCPeerConnection = (this.opts || {}).RTCPeerConnection ||
     detect('RTCPeerConnection');
 
-  var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
-    detect('RTCIceCandidate');
-
-  var pc = this._connections[targetId] = new RTCPeerConnection(
+  var pc = new RTCPeerConnection(
     // generate the config based on options provided
     defaults({}, (this.opts || {}).config, { iceServers: [] }),
 
@@ -354,12 +238,17 @@ proto._initPeerConnection = function(targetId) {
     (this.opts || {}).constraints
   );
 
-  // handle candidates getting passed across
-  this.signaller.on('broker:candidates:' + targetId, function(candidates) {
-    candidates.forEach(function(candidate) {
-      pc.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-  });
+  // if our role is the master role (roleIdx == 0), then create the
+  // data channel
+  if (peerData.roleIdx === 0) {
+    this.expandMesh(targetId, pc.createDataChannel('rtc-mesh-syncstate'));
+    this._negotiate(targetId, pc, pc.createOffer);
+  }
+  else {
+    pc.ondatachannel = function(evt) {
+      peer.expandMesh(targetId, evt.channel);
+    };
+  }
 
   pc.onicecandidate = function(evt) {
     if (evt.candidate) {
@@ -369,8 +258,12 @@ proto._initPeerConnection = function(targetId) {
     // if we have gathered all the candidates, then batch and send
     if (pc.iceGatheringState === 'complete') {
       debug('ice gathering state is completed, sending discovered candidates');
-      channel.send('/broker:candidates:' + peer.id, candidates.splice(0));
+      channel.send('/mesh:candidates', candidates.splice(0));
     }
+  };
+
+  pc.onsignalingstatechange = function(evt) {
+    peer.emit(pc.signalingState);
   };
 
   pc.oniceconnectionstatechange = function(evt) {
@@ -380,4 +273,28 @@ proto._initPeerConnection = function(targetId) {
   };
 
   return pc;
+};
+
+/**
+  #### _negotiate(targetId, pc, negotiateFn)
+
+  Used to handle the `createOffer` or `createAnswer` interaction.
+**/
+proto._negotiate = function(targetId, pc, negotiateFn) {
+
+  var peer = this;
+  var fail = this.emit.bind(this, 'error');
+
+  function haveDescription(desc) {
+    pc.setLocalDescription(
+      desc,
+      function() {
+        peer.signaller.to(targetId).send('/mesh:sdp', desc);
+      },
+      peer.emit.bind(peer, 'error')
+    )
+  }
+
+  debug(this.id + ' negotiating pc with target ' + targetId);
+  negotiateFn.call(pc, haveDescription, fail);
 };
