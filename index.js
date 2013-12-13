@@ -29,6 +29,10 @@ var RTCMeshMember = require('./member');
 
   <<< examples/simple.js
 
+  ## Firefox to Chrome Interop
+
+  Tested Chrome 32 <==> Firefox 26 and it works nicely :)
+
   ## Reference
 
 **/

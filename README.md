@@ -46,6 +46,10 @@ mesh.join('meshdemo-simple', function(err, m) {
 
 ```
 
+## Firefox to Chrome Interop
+
+Tested Chrome 32 <==> Firefox 26 and it works nicely :)
+
 ## Reference
 
 ### join(roomName, opts?, callback)
