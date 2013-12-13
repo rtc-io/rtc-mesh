@@ -13,11 +13,11 @@ var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
 /**
-  ### RTCSmartPeer(attributes, opts)
+  ### RTCMeshMember(attributes, opts)
 **/
-function RTCSmartPeer(opts) {
-  if (! (this instanceof RTCSmartPeer)) {
-    return new RTCSmartPeer(opts);
+function RTCMeshMember(opts) {
+  if (! (this instanceof RTCMeshMember)) {
+    return new RTCMeshMember(opts);
   }
 
   // init
@@ -53,9 +53,9 @@ function RTCSmartPeer(opts) {
   this.signalhost = opts.signalhost || location.origin;
 }
 
-util.inherits(RTCSmartPeer, EventEmitter);
-module.exports = RTCSmartPeer;
-var proto = RTCSmartPeer.prototype;
+util.inherits(RTCMeshMember, EventEmitter);
+module.exports = RTCMeshMember;
+var proto = RTCMeshMember.prototype;
 
 /**
   #### announce(data)
