@@ -15,11 +15,19 @@ var RTCMeshMember = require('./member');
 
   ## How it works
 
-  To be completed.
+  The `rtc-mesh` module works by setting up a data-only WebRTC peer connection
+  as peers are discovered in a particular room
+  (using [rtc-signaller](https://github.com/rtc-io/rtc-signaller)).  A node
+  compatible stream is then wrapped around the stream and we use
+  [scuttlebutt](https://github.com/dominictarr/scuttlebutt) to keep data in
+  sync with other peers via the data channel.
 
-  ## Usage
+  ## Example Usage
 
-  To be completed
+  Below is a simple example showing how you can join a mesh, and update the
+  shared data of the mesh:
+
+  <<< examples/simple.js
 
   ## Reference
 
