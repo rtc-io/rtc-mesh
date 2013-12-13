@@ -4,7 +4,7 @@
 
 var defaults = require('./defaults');
 var extend = require('cog/extend');
-var SmartPeer = require('./smartpeer');
+var RTCMeshMember = require('./member');
 
 /**
   # rtc-mesh
@@ -42,7 +42,7 @@ var join = exports.join = function(roomName, opts, callback) {
   callback = callback || function() {};
 
   // create a new peer instance
-  peer = new SmartPeer(extend({}, opts));
+  peer = new RTCMeshMember(extend({}, opts));
 
   // handle errors during connection
   peer.on('error', callback);

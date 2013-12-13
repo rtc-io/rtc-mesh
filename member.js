@@ -30,6 +30,9 @@ function RTCMeshMember(opts) {
   this.socket = null;
   this.signaller = null;
 
+  // create a peers array to track existing known peers
+  this.peers = [];
+
   // initialise the channels hash
   this._connections = {};
   this._channels = {};
