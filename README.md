@@ -11,11 +11,40 @@ mesh to be created and kept in sync (using
 
 ## How it works
 
-To be completed.
+The `rtc-mesh` module works by setting up a data-only WebRTC peer connection
+as peers are discovered in a particular room
+(using [rtc-signaller](https://github.com/rtc-io/rtc-signaller)).  A node
+compatible stream is then wrapped around the stream and we use
+[scuttlebutt](https://github.com/dominictarr/scuttlebutt) to keep data in
+sync with other peers via the data channel.
 
-## Usage
+## Example Usage
 
-To be completed
+Below is a simple example showing how you can join a mesh, and update the
+shared data of the mesh:
+
+```js
+var mesh = require('rtc-mesh');
+
+// use the demo rtc.io signalling server
+mesh.use('http://rtc.io/switchboard/');
+
+// join the mesh in the friends test room
+mesh.join('meshdemo-simple', function(err, m) {
+  if (err) {
+    return console.error('could not connect: ', err);
+  }
+
+  m.on('data:update', function(key, value) {
+    console.log('key: ' + key + ', set to: ', value);
+  });
+
+  // update the last join time for the shared data
+  m.data.set('lastjoin', Date.now());
+});
+
+
+```
 
 ## Reference
 
@@ -23,7 +52,7 @@ To be completed
 
 ### use(signalhost)
 
-### RTCSmartPeer(attributes, opts)
+### RTCMeshMember(attributes, opts)
 
 #### announce(data)
 
