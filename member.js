@@ -50,6 +50,9 @@ function RTCMeshMember(opts) {
     // TODO: write data
   }
 
+  // inherit the id from our data instance
+  this.id = this.data.id;
+
   // if the data is a scuttlebutt model, then handle data updates
   if (this.data instanceof Model) {
     this.data.on('update', this._handleDataUpdate.bind(this));
@@ -233,10 +236,10 @@ proto._handlePeerAnnounce = function(data) {
   );
 
   // create the peer
-  var peer = this.peers[data.id] = dataslice(this.data, data.id);
+  // var peer = this.peers[data.id] = dataslice(this.data, data.id);
 
   // trigger the peer:join event
-  this.emit('peer:join', peer);
+  this.emit('peer:join', data);
 };
 
 proto._handlePeerLeave = function(id) {
