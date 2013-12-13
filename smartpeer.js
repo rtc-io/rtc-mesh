@@ -15,7 +15,7 @@ var util = require('util');
 /**
   ### RTCSmartPeer(attributes, opts)
 **/
-function RTCSmartPeer(attributes, opts) {
+function RTCSmartPeer(opts) {
   if (! (this instanceof RTCSmartPeer)) {
     return new RTCSmartPeer(opts);
   }
@@ -198,8 +198,6 @@ proto._handleCandidates = function(srcInfo, candidates) {
 **/
 proto._handleDataUpdate = function(pairs, clock, src) {
   var peer = this.signaller.peers.get(src) || this;
-
-  this._debug('received data update from: ' + src);
   this.emit('update', pairs[0], pairs[1], peer);
 };
 
