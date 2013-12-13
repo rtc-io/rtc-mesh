@@ -1,36 +1,28 @@
 var mesh = require('../');
+var createPeer = require('./helpers/createPeer');
 var test = require('tape');
-var peerA, peerB;
+var peers = [];
 var roomId = require('uuid').v4();
+var MAX_PEERS = process.env.MAX_PEERS || 4;
 
-test('create peer a', function(t) {
-  t.plan(2);
+// mesh.use('http://localhost:3000');
+// require('cog/logger').enable('rtc-mesh-smartpeer');
 
-  // join the mesh
-  mesh.join(roomId, function(err, p) {
-    t.ifError(err);
-    t.ok(peerA = p, 'peer a created an online');
-  });
-});
+for (var ii = 0; ii < MAX_PEERS; ii++) {
+  test('create peer ' + ii, createPeer(roomId, peers));
+}
 
-test('create peer b', function(t) {
-  t.plan(2);
-
-  // peer b join
-  mesh.join(roomId, function(err, p) {
-    t.ifError(err);
-    t.ok(peerB = p, 'peer b created and online');
-  });
-});
-
-test('update peer a data, peer b get\'s update', function(t) {
-  t.plan(2);
+test('all peers get an update for a simple key change', function(t) {
+  t.plan(peers.length * 2);
 
   function handleUpdate(key, value) {
     t.equal(key, 'name', 'Got a name update');
     t.equal(value, 'Bob', 'Name updated to Bob');
   }
 
-  peerB.set('name', 'Bob');
-  peerA.on('update', handleUpdate);
+  peers.forEach(function(peer) {
+    peer.once('update', handleUpdate);
+  });
+
+  peers[0].set('name', 'Bob');
 });
