@@ -14,6 +14,7 @@ function updateFriend(id, data) {
 }
 
 function watchPeer(peer) {
+  console.log('new peer: ', peer);
 }
 
 document.body.appendChild(friendList = crel('ul', {
@@ -37,7 +38,6 @@ mesh.join('presencetest', function(err, m) {
   }
 
   // connect to existing peers and wait for new peers to join
-  m.eachPeer(watchPeer);
   m.on('peer:join', watchPeer);
 
   // m.meshState.on('update', )
