@@ -9,9 +9,6 @@ mesh to be created and kept in sync (using
 [![NPM](https://nodei.co/npm/rtc-mesh.png)](https://nodei.co/npm/rtc-mesh/)
 
 
-[![browser support](https://ci.testling.com/rtc-io/rtc-mesh.png)](https://ci.testling.com/rtc-io/rtc-mesh)
-
-
 ## How it works
 
 To be completed.
@@ -22,7 +19,11 @@ To be completed
 
 ## Reference
 
-### RTCMesh(attributes, opts)
+### join(roomName, opts?, callback)
+
+### use(signalhost)
+
+### RTCSmartPeer(attributes, opts)
 
 #### announce(data)
 
@@ -30,32 +31,30 @@ Announce ourselves to the global signaller
 
 #### close()
 
-#### connect(targetAttr)
+#### expandMesh(targetId, dc)
 
-Open a connection to a participant on the signalling channel that
-matches the given attributes.  If there is not currently any peers
-available on the signalling server that match the required target
-attributes, then the mesh will continue to monitor for new peers that
-match the target criteria.
+#### getChannel(targetId)
 
-#### expandMesh(datachannel, targetId)
+#### getConnection(targetId)
 
 ### RTCMesh internal methods
 
-#### _brokerConnection(targetId)
+#### _handleDataUpdate(pairs, clock, src)
 
-Setup an `RTCPeerConnection` between ourselves and the specified target
-mesh endpoint (as specified by the id).
+This is the event handler for the scuttlebutt `update` event.
 
-#### _handleEstablish(srcId)
+#### _handlePeer
 
-This is the internal handler for dealing with `/establish` commands sent
-to this mesh endpoint.
+#### _handleSdp
 
 #### _initPeerConnection(targetId)
 
 Create a new `RTCPeerConnection` for the specified target id.  This method
 also handles basic initialization of the peer connection.
+
+#### _negotiate(targetId, pc, negotiateFn)
+
+Used to handle the `createOffer` or `createAnswer` interaction.
 
 ## License(s)
 
