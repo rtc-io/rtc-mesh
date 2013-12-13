@@ -37,7 +37,7 @@ mesh.join('presencetest', function(err, m) {
   }
 
   // connect to existing peers and wait for new peers to join
-  m.peers.forEach(watchPeer);
+  m.eachPeer(watchPeer);
   m.on('peer:join', watchPeer);
 
   // m.meshState.on('update', )

@@ -8,6 +8,7 @@ var detect = require('rtc-core/detect');
 var extend = require('cog/extend');
 var sig = require('rtc-signaller');
 var dcstream = require('rtc-dcstream');
+var ScuttleButt = require('scuttlebutt');
 var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
@@ -37,17 +38,22 @@ function RTCMeshMember(opts) {
   this._connections = {};
   this._channels = {};
 
-  // initialise the data
-  this.data = new Model();
+  // if we have been provided an alternatve scuttlebutt implementation
+  // use that
+  if (opts.data instanceof ScuttleButt) {
+    this.data = opts.data;
+  }
+  // otherwise create a model, and write and data provided into the model
+  else {
+    this.data = new Model();
 
-  // patch in the get and set methods directly into the peer
-  this.id = this.data.id;
-  this.get = this.data.get.bind(this.data);
-  this.set = this.data.set.bind(this.data);
+    // TODO: write data
+  }
 
-  // trigger update events on the smartpeer when the data changes
-  this.data.on('update', this._handleDataUpdate.bind(this));
-  this.data.on('sync', this._handleDataSync.bind(this));
+  // if the data is a scuttlebutt model, then handle data updates
+  if (this.data instanceof Model) {
+    this.data.on('update', this._handleDataUpdate.bind(this));
+  }
 
   // init internal members
   this._dc = null;
@@ -66,7 +72,7 @@ var proto = RTCMeshMember.prototype;
   Announce ourselves to the global signaller
 **/
 proto.announce = function(data) {
-  var peer = this;
+  var m = this;
   var socket;
 
   // if we already have a signaller, simply announce the new data
@@ -78,35 +84,36 @@ proto.announce = function(data) {
   // load primus and then carry on
   sig.loadPrimus(this.signalhost, function(err, Primus) {
     if (err) {
-      return peer.emit('error', err);
+      return m.emit('error', err);
     }
 
     // create the socket
-    peer._debug('primus loaded, creating new socket to: ' + peer.signalhost);
-    socket = peer.socket = new Primus(peer.signalhost);
+    m._debug('primus loaded, creating new socket to: ' + m.signalhost);
+    socket = m.socket = new Primus(m.signalhost);
 
     socket.once('open', function() {
       // create our internal signaller
-      peer._debug('socket to signalling server open, creating signaller');
-      var signaller = peer.signaller = sig(socket);
+      m._debug('socket to signalling server open, creating signaller');
+      var signaller = m.signaller = sig(socket);
 
       // override the signaller id using scuttlebutt's id
-      signaller.id = peer.data.id;
+      signaller.id = m.data.id;
 
       // announce ourselves with the data
       signaller.announce(data);
 
       // when we meet new friends, create a dc:only peer connection
-      signaller.on('peer:announce', peer._handlePeer.bind(peer));
-      signaller.on('mesh:sdp', peer._handleSdp.bind(peer));
-      signaller.on('mesh:candidates', peer._handleCandidates.bind(peer));
+      signaller.on('peer:announce', m._handlePeerAnnounce.bind(m));
+      signaller.on('peer:leave', m._handlePeerLeave.bind(m));
+      signaller.on('mesh:sdp', m._handleSdp.bind(m));
+      signaller.on('mesh:candidates', m._handleCandidates.bind(m));
 
       // emit the online event
-      peer.emit('online');
+      m.emit('online');
     });
 
     // when the socket ends, trigger the close event
-    peer.socket.once('end', peer.emit.bind(peer, 'close'));
+    m.socket.once('end', m.emit.bind(m, 'close'));
   });
 };
 
@@ -166,14 +173,14 @@ proto.getConnection = function(targetId) {
 
 proto._handleCandidates = function(srcInfo, candidates) {
   var pc = srcInfo && this._connections[srcInfo.id]
-  var peer = this;
+  var m = this;
   var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
     detect('RTCIceCandidate');
 
   function handleStateChange() {
     if (pc.signalingState === 'stable') {
       pc.removeEventListener('signalingstatechange', handleStateChange);
-      peer._handleCandidates(srcInfo, candidates);
+      m._handleCandidates(srcInfo, candidates);
     }
   }
 
@@ -201,7 +208,7 @@ proto._handleCandidates = function(srcInfo, candidates) {
 **/
 proto._handleDataUpdate = function(pairs, clock, src) {
   var peer = this.signaller.peers.get(src) || this;
-  this.emit('update', pairs[0], pairs[1], peer);
+  this.emit('data:update', pairs[0], pairs[1], peer);
 };
 
 proto._handleDataSync = function() {
@@ -212,19 +219,28 @@ proto._handleDataSync = function() {
   #### _handlePeer
 
 **/
-proto._handlePeer = function(data) {
+proto._handlePeerAnnounce = function(data) {
   // ensure the new peer is valid
   var validPeer = data && data.id && (! this._connections[data.id]);
-
   if (! validPeer) {
     return;
   }
 
   // create a new connection for the peer
-  this._connections[data.id] = this._initPeerConnection(
+  var pc = this._connections[data.id] = this._initPeerConnection(
     data.id,
     this.signaller.peers.get(data.id)
   );
+
+  // create the peer
+  var peer = this.peers[data.id] = dataslice(this.data, data.id);
+
+  // trigger the peer:join event
+  this.emit('peer:join', peer);
+};
+
+proto._handlePeerLeave = function(id) {
+
 };
 
 /**
@@ -237,7 +253,7 @@ proto._handleSdp = function(srcInfo, desc) {
   var RTCSessionDescription = (this.opts || {}).RTCSessionDescription ||
     detect('RTCSessionDescription');
   var pc = srcInfo && this._connections[srcInfo.id];
-  var peer = this;
+  var m = this;
 
   // if we don't have a pc connection
   if (! pc) {
@@ -250,7 +266,7 @@ proto._handleSdp = function(srcInfo, desc) {
     function() {
       // if it was an offer, then create an answer
       if (desc.type == 'offer') {
-        peer._negotiate(srcInfo.id, pc, pc.createAnswer);
+        m._negotiate(srcInfo.id, pc, pc.createAnswer);
       }
     },
     fail
@@ -273,7 +289,7 @@ proto._debug = function(message) {
 proto._initPeerConnection = function(targetId, peerData) {
   var candidates = [];
   var channel = this.signaller.to(targetId);
-  var peer = this;
+  var m = this;
 
   var RTCPeerConnection = (this.opts || {}).RTCPeerConnection ||
     detect('RTCPeerConnection');
@@ -296,7 +312,7 @@ proto._initPeerConnection = function(targetId, peerData) {
   }
   else {
     pc.ondatachannel = function(evt) {
-      peer.expandMesh(targetId, evt.channel);
+      m.expandMesh(targetId, evt.channel);
     };
   }
 
@@ -307,15 +323,15 @@ proto._initPeerConnection = function(targetId, peerData) {
 
     // if we have gathered all the candidates, then batch and send
     if (pc.iceGatheringState === 'complete') {
-      peer._debug('ice gathering state is completed, sending discovered candidates');
+      m._debug('ice gathering state is completed, sending discovered candidates');
       channel.send('/mesh:candidates', candidates.splice(0));
     }
   };
 
   pc.oniceconnectionstatechange = function(evt) {
     if (pc.iceConnectionState === 'connected') {
-      peer._debug('connection active to ' + targetId);
-      peer.emit('connected', pc);
+      m._debug('connection active to ' + targetId);
+      m.emit('connected', pc);
     }
   };
 
@@ -329,16 +345,16 @@ proto._initPeerConnection = function(targetId, peerData) {
 **/
 proto._negotiate = function(targetId, pc, negotiateFn) {
 
-  var peer = this;
+  var m = this;
   var fail = this.emit.bind(this, 'error');
 
   function haveDescription(desc) {
     pc.setLocalDescription(
       desc,
       function() {
-        peer.signaller.to(targetId).send('/mesh:sdp', desc);
+        m.signaller.to(targetId).send('/mesh:sdp', desc);
       },
-      peer.emit.bind(peer, 'error')
+      m.emit.bind(m, 'error')
     )
   }
 

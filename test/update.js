@@ -21,8 +21,8 @@ test('all peers get an update for a simple key change', function(t) {
   }
 
   peers.forEach(function(peer) {
-    peer.once('update', handleUpdate);
+    peer.once('data:update', handleUpdate);
   });
 
-  peers[0].set('name', 'Bob');
+  peers[0].data.set('name', 'Bob');
 });
