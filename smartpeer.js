@@ -79,12 +79,12 @@ proto.announce = function(data) {
     }
 
     // create the socket
-    debug('primus loaded, creating new socket to: ' + peer.signalhost);
+    peer._debug('primus loaded, creating new socket to: ' + peer.signalhost);
     socket = peer.socket = new Primus(peer.signalhost);
 
     socket.once('open', function() {
       // create our internal signaller
-      debug('socket to signalling server open, creating signaller');
+      peer._debug('socket to signalling server open, creating signaller');
       var signaller = peer.signaller = sig(socket);
 
       // override the signaller id using scuttlebutt's id
@@ -123,10 +123,8 @@ proto.close = function() {
 proto.expandMesh = function(targetId, dc) {
   // create a new stream
   var stream = dcstream(dc);
-
-  // create a new stream for scuttlebutt synchronization
-  var dataStream = this.data.createStream();
-  debug('new data channel available for target: ' + targetId);
+  var peer = this;
+  this._debug('new data channel available for target: ' + targetId);
 
   // set the dc binary type to arraybuffer
   dc.binaryType = 'arraybuffer';
@@ -140,8 +138,9 @@ proto.expandMesh = function(targetId, dc) {
 
   // connect the stream to the data
   // debugger;
-  stream.pipe(dataStream).pipe(stream);
-  debug('data synchronization in progress');
+  this.data.createReadStream().pipe(stream).pipe(this.data.createWriteStream());
+  // stream.pipe(dataStream).pipe(stream);
+  this._debug('data synchronization in progress');
 };
 
 /**
@@ -164,9 +163,16 @@ proto.getConnection = function(targetId) {
 
 proto._handleCandidates = function(srcInfo, candidates) {
   var pc = srcInfo && this._connections[srcInfo.id]
-  var retry = this._handleCandidates.bind(this, srcInfo, candidates);
+  var peer = this;
   var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
     detect('RTCIceCandidate');
+
+  function handleStateChange() {
+    if (pc.signalingState === 'stable') {
+      pc.removeEventListener('signalingstatechange', handleStateChange);
+      peer._handleCandidates(srcInfo, candidates);
+    }
+  }
 
   // if we don't have a pc connection
   if (! pc) {
@@ -176,7 +182,7 @@ proto._handleCandidates = function(srcInfo, candidates) {
   // if the peer connection does not yet have a remote description,
   // wait until the signaling state is stable and then apply the candidates
   if (! pc.remoteDescription) {
-    return this.once('stable', retry);
+    pc.addEventListener('signalingstatechange', handleStateChange);
   }
 
   // apply the candidates
@@ -193,6 +199,7 @@ proto._handleCandidates = function(srcInfo, candidates) {
 proto._handleDataUpdate = function(pairs, clock, src) {
   var peer = this.signaller.peers.get(src) || this;
 
+  this._debug('received data update from: ' + src);
   this.emit('update', pairs[0], pairs[1], peer);
 };
 
@@ -213,7 +220,6 @@ proto._handlePeer = function(data) {
   }
 
   // create a new connection for the peer
-  debug(this.id + ' creating a new connection to ' + data.id);
   this._connections[data.id] = this._initPeerConnection(
     data.id,
     this.signaller.peers.get(data.id)
@@ -250,6 +256,12 @@ proto._handleSdp = function(srcInfo, desc) {
   );
 };
 
+proto._debug = function(message) {
+  var extra = [].slice.call(arguments, 1);
+
+  debug.apply(debug, [this.id + ' ' + message].concat(extra));
+};
+
 /**
   #### _initPeerConnection(targetId)
 
@@ -273,6 +285,8 @@ proto._initPeerConnection = function(targetId, peerData) {
     (this.opts || {}).constraints
   );
 
+  this._debug('creating a new connection to ' + targetId);
+
   // if our role is the master role (roleIdx == 0), then create the
   // data channel
   if (peerData.roleIdx === 0) {
@@ -292,18 +306,15 @@ proto._initPeerConnection = function(targetId, peerData) {
 
     // if we have gathered all the candidates, then batch and send
     if (pc.iceGatheringState === 'complete') {
-      debug('ice gathering state is completed, sending discovered candidates');
+      peer._debug('ice gathering state is completed, sending discovered candidates');
       channel.send('/mesh:candidates', candidates.splice(0));
     }
   };
 
-  pc.onsignalingstatechange = function(evt) {
-    peer.emit(pc.signalingState);
-  };
-
   pc.oniceconnectionstatechange = function(evt) {
     if (pc.iceConnectionState === 'connected') {
-      peer.emit('connected');
+      peer._debug('connection active to ' + targetId);
+      peer.emit('connected', pc);
     }
   };
 
@@ -330,6 +341,6 @@ proto._negotiate = function(targetId, pc, negotiateFn) {
     )
   }
 
-  debug(this.id + ' negotiating pc with target ' + targetId);
+  this._debug('negotiating pc with target ' + targetId);
   negotiateFn.call(pc, haveDescription, fail);
 };
