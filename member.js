@@ -11,6 +11,7 @@ var dcstream = require('rtc-dcstream');
 var ScuttleButt = require('scuttlebutt');
 var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
+var Broadcast = require('./broadcast');
 var util = require('util');
 
 /**
@@ -118,6 +119,13 @@ proto.announce = function(data) {
     // when the socket ends, trigger the close event
     m.socket.once('end', m.emit.bind(m, 'close'));
   });
+};
+
+/**
+  #### broadcast(stream, opts)
+**/
+proto.broadcast = function(media, opts) {
+  return new Broadcast(this, media, opts);
 };
 
 /**
