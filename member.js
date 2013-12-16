@@ -49,6 +49,9 @@ function RTCMeshMember(opts) {
     this.data = new Model();
 
     // TODO: write data
+
+    // monitor data changes
+    this.data.on('change', require('./broadcast-monitor')(this));
   }
 
   // inherit the id from our data instance
