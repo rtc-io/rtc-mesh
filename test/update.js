@@ -13,15 +13,15 @@ for (var ii = 0; ii < MAX_PEERS; ii++) {
 }
 
 test('all peers get an update for a simple key change', function(t) {
-  t.plan(peers.length * 2);
+  t.plan(peers.length);
 
-  function handleUpdate(key, value) {
-    t.equal(key, 'name', 'Got a name update');
+  function handleUpdate(value) {
+   //  t.equal(key, 'name', 'Got a name update');
     t.equal(value, 'Bob', 'Name updated to Bob');
   }
 
   peers.forEach(function(peer) {
-    peer.once('data:update', handleUpdate);
+    peer.data.once('change:name', handleUpdate);
   });
 
   peers[0].data.set('name', 'Bob');
