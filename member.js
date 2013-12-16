@@ -4,6 +4,7 @@
 var async = require('async');
 var debug = require('cog/logger')('rtc-mesh-smartpeer');
 var defaults = require('cog/defaults');
+var extend = require('cog/extend');
 var detect = require('rtc-core/detect');
 var extend = require('cog/extend');
 var sig = require('rtc-signaller');
@@ -35,6 +36,9 @@ function RTCMeshMember(opts) {
   // create a peers array to track existing known peers
   this.peers = [];
 
+  // initialise a datalines object
+  this.datalines = {};
+
   // initialise the channels hash
   this._connections = {};
   this._channels = {};
@@ -51,7 +55,7 @@ function RTCMeshMember(opts) {
     // TODO: write data
 
     // monitor data changes
-    this.data.on('change', require('./broadcast-monitor')(this));
+    this.data.on('change', require('./broadcast-monitor')(this, opts));
   }
 
   // inherit the id from our data instance
@@ -122,13 +126,6 @@ proto.announce = function(data) {
     // when the socket ends, trigger the close event
     m.socket.once('end', m.emit.bind(m, 'close'));
   });
-};
-
-/**
-  #### broadcast(stream, opts)
-**/
-proto.broadcast = function(media, opts) {
-  return new Broadcast(this, media, opts);
 };
 
 /**
@@ -327,12 +324,32 @@ proto._initPeerConnection = function(targetId, peerData) {
   // if our role is the master role (roleIdx == 0), then create the
   // data channel
   if (peerData.roleIdx === 0) {
-    this.expandMesh(targetId, pc.createDataChannel('rtc-mesh-syncstate'));
+    // create the data line data channel
+    m.datalines[targetId] = pc.createDataChannel('dataline');
+
+    // create the synchronization state channel used by scuttlebutt
+    this.expandMesh(targetId, pc.createDataChannel('syncstate'));
+
+    // negotiate connections
     this._negotiate(targetId, pc, pc.createOffer);
   }
   else {
     pc.ondatachannel = function(evt) {
-      m.expandMesh(targetId, evt.channel);
+      var validChannel = evt && evt.channel;
+      if (! validChannel) {
+        return;
+      }
+
+      switch (evt.channel.label) {
+        case 'syncstate': {
+          m.expandMesh(targetId, evt.channel);
+          break;
+        }
+
+        case 'dataline': {
+          m.datalines[targetId] = evt.channel;
+        }
+      }
     };
   }
 
