@@ -137,6 +137,9 @@ proto.expandMesh = function(targetId, dc) {
   // create a new stream
   var stream = dcstream(dc);
   var peer = this;
+  var reader = this.data.createReadStream();
+  var writer = this.data.createWriteStream();
+
   this._debug('new data channel available for target: ' + targetId);
 
   // set the dc binary type to arraybuffer
@@ -150,8 +153,11 @@ proto.expandMesh = function(targetId, dc) {
   });
 
   // connect the stream to the data
-  // debugger;
-  this.data.createReadStream().pipe(stream).pipe(this.data.createWriteStream());
+  reader.pipe(stream).pipe(writer);
+
+  // bubble sync events
+  writer.on('sync', this.emit.bind(this, 'sync'));
+
   // stream.pipe(dataStream).pipe(stream);
   this._debug('data synchronization in progress');
 };
