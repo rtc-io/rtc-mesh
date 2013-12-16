@@ -12,7 +12,6 @@ var dcstream = require('rtc-dcstream');
 var ScuttleButt = require('scuttlebutt');
 var Model = require('scuttlebutt/model');
 var EventEmitter = require('events').EventEmitter;
-var Broadcast = require('./broadcast');
 var util = require('util');
 
 /**
@@ -55,7 +54,6 @@ function RTCMeshMember(opts) {
     // TODO: write data
 
     // monitor data changes
-    this.data.on('change', require('./broadcast-monitor')(this, opts));
   }
 
   // inherit the id from our data instance
