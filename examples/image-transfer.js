@@ -6,8 +6,7 @@ var filestream = require('filestream');
 var img = crel('img');
 
 // use the demo rtc.io signalling server
-// mesh.use('http://rtc.io/switchboard/');
-mesh.use('http://localhost:3000/');
+mesh.use('http://rtc.io/switchboard/');
 // require('cog/logger').enable('rtc-dcstream');
 
 // join the mesh in the friends test room
