@@ -2,7 +2,7 @@
 'use strict';
 
 var async = require('async');
-var debug = require('cog/logger')('rtc-mesh-smartpeer');
+var debug = require('cog/logger')('rtc-mesh');
 var defaults = require('cog/defaults');
 var extend = require('cog/extend');
 var detect = require('rtc-core/detect');
@@ -35,12 +35,11 @@ function RTCMeshMember(opts) {
   // create a peers array to track existing known peers
   this.peers = [];
 
-  // initialise a datalines object
-  this.datalines = {};
-
   // initialise the channels hash
   this._connections = {};
   this._channels = {};
+  this._datalines = {};
+  this._datastreams = {};
 
   // if we have been provided an alternatve scuttlebutt implementation
   // use that
@@ -180,6 +179,104 @@ proto.getChannel = function(targetId) {
 **/
 proto.getConnection = function(targetId) {
   return this._connections[targetId];
+};
+
+/**
+  #### initDataLine(targetId, dc)
+**/
+proto.initDataLine = function(targetId, dc) {
+  var m = this;
+  var activeStream;
+
+  function handleMessage(evt) {
+    if (evt.data === '/stream') {
+      activeStream = dcstream(dc);
+
+      if (m._datastreams[targetId]) {
+        // TODO: if we have an existing stream from this target, then close it
+      }
+
+      // tell the world about our new stream
+      m.emit('datastream:' + targetId, activeStream);
+      m._datastreams[targetId] = activeStream;
+
+      // activeStream.once('end', function() {
+      //   console.log('stream ended');
+      // });
+
+      // activeStream.once('close', function() {
+      //   console.log('stream closed');
+      // });
+
+      // activeStream.once('finish', function() {
+      //   console.log('stream finished');
+      // });
+    }
+  }
+
+  // set the dc binary type to arraybuffer
+  dc.binaryType = 'arraybuffer';
+
+  // listen for messages on the dataline
+  dc.addEventListener('message', handleMessage);
+
+  // save a reference to the dataline
+  this._datalines[targetId] = dc;
+
+  // trigger the dataline availability event
+  this.emit('dataline:' + targetId, dc);
+};
+
+/**
+  #### to(targetId, callback)
+
+  Using the dataline between this member and the target, create a stream
+  instance that will enable comms.
+
+**/
+proto.to = function(targetId, callback) {
+  var dc = this._datalines[targetId];
+  var activeStream = this._datastreams[targetId];
+  var m = this;
+
+  function channelReady() {
+    // tell the other end to expect a stream
+    dc.send('/stream');
+
+    // when the stream finishes, clear the reference
+    activeStream.once('finish', function() {
+      m._debug('outbound stream to ' + targetId + ' finished');
+      if (m._datastreams[targetId] === activeStream) {
+        m._debug('released stream reference to: ' + targetId);
+        m._datastreams[targetId] = null;
+      }
+    });
+
+    // create the stream and trigger the callback
+    callback(null, activeStream);
+  }
+
+  // if we already have an active stream, then report an error
+  if (activeStream) {
+    return callback(new Error('active stream already open to target: ' + targetId));
+  }
+
+  // if the data channel does not exist, then abort
+  if (! dc) {
+    return this.once('dataline:' + targetId, function() {
+      m.to(targetId, callback);
+    });
+  }
+
+  // create the stream
+  activeStream = m._datastreams[targetId] = dcstream(dc);
+
+  // wait for open
+  if (dc.readyState !== 'open') {
+    return dc.addEventListener('open', channelReady);
+  }
+
+  channelReady();
 };
 
 /**
@@ -323,7 +420,7 @@ proto._initPeerConnection = function(targetId, peerData) {
   // data channel
   if (peerData.roleIdx === 0) {
     // create the data line data channel
-    m.datalines[targetId] = pc.createDataChannel('dataline');
+    this.initDataLine(targetId, pc.createDataChannel('dataline'));
 
     // create the synchronization state channel used by scuttlebutt
     this.expandMesh(targetId, pc.createDataChannel('syncstate'));
@@ -345,7 +442,8 @@ proto._initPeerConnection = function(targetId, peerData) {
         }
 
         case 'dataline': {
-          m.datalines[targetId] = evt.channel;
+          m._debug('received dataline from ' + targetId);
+          m.initDataLine(targetId, evt.channel);
         }
       }
     };
