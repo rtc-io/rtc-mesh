@@ -189,7 +189,8 @@ proto.initDataLine = function(targetId, dc) {
   var activeStream;
 
   function handleMessage(evt) {
-    if (evt.data === '/stream') {
+    var parts = (evt && typeof evt.data == 'string') ? evt.data.split(':') : [];
+    if (parts[0] === '/stream') {
       activeStream = dcstream(dc);
 
       if (m._datastreams[targetId]) {
@@ -197,7 +198,8 @@ proto.initDataLine = function(targetId, dc) {
       }
 
       // tell the world about our new stream
-      m.emit('datastream:' + targetId, activeStream);
+      m.emit('datastream:' + targetId, activeStream, parts[1]);
+      m.emit('datastream', targetId, activeStream, parts[1]);
       m._datastreams[targetId] = activeStream;
 
       // activeStream.once('end', function() {
@@ -234,14 +236,23 @@ proto.initDataLine = function(targetId, dc) {
   instance that will enable comms.
 
 **/
-proto.to = function(targetId, callback) {
+proto.to = function(targetId, opts, callback) {
   var dc = this._datalines[targetId];
   var activeStream = this._datastreams[targetId];
   var m = this;
+  var dataType;
+
+  if (typeof opts == 'function') {
+    callback = opts;
+    opts = {};
+  }
+
+  // initialise the datatype
+  dataType = (opts || {}).type || 'text';
 
   function channelReady() {
     // tell the other end to expect a stream
-    dc.send('/stream');
+    dc.send('/stream:' + dataType);
 
     // when the stream finishes, clear the reference
     activeStream.once('finish', function() {
