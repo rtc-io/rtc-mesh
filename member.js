@@ -58,11 +58,6 @@ function RTCMeshMember(opts) {
   // inherit the id from our data instance
   this.id = this.data.id;
 
-  // if the data is a scuttlebutt model, then handle data updates
-  if (this.data instanceof Model) {
-    this.data.on('update', this._handleDataUpdate.bind(this));
-  }
-
   // init internal members
   this._dc = null;
 
@@ -116,7 +111,20 @@ proto.announce = function(data) {
       signaller.on('mesh:sdp', m._handleSdp.bind(m));
       signaller.on('mesh:candidates', m._handleCandidates.bind(m));
 
-      // emit the online event
+      // wait for room info before determining appropriate action
+      signaller.once('roominfo', function(data) {
+        var isFirst = (! data) || (data.memberCount === 1);
+
+        // if we are the first member, then emit the online trigger immediately
+        if (isFirst) {
+          return m.emit('sync');
+        }
+
+        // otherwise we need to wait for synchronization with the other peers
+        m._waitForInitialSync(data);
+      });
+
+      // we are online
       m.emit('online');
     });
 
@@ -161,7 +169,7 @@ proto.expandMesh = function(targetId, dc) {
   reader.pipe(stream).pipe(writer);
 
   // bubble sync events
-  writer.on('sync', this.emit.bind(this, 'sync'));
+  writer.on('sync', this.emit.bind(this, 'sync:' + targetId));
 
   // stream.pipe(dataStream).pipe(stream);
   this._debug('data synchronization in progress');
@@ -294,7 +302,7 @@ proto.to = function(targetId, opts, callback) {
   ### RTCMesh internal methods
 **/
 
-proto._handleCandidates = function(srcInfo, candidates) {
+proto._handleCandidates = function(candidates, srcInfo) {
   var pc = srcInfo && this._connections[srcInfo.id]
   var m = this;
   var RTCIceCandidate = (this.opts || {}).RTCIceCandidate ||
@@ -322,20 +330,6 @@ proto._handleCandidates = function(srcInfo, candidates) {
   (candidates || []).forEach(function(candidate) {
     pc.addIceCandidate(new RTCIceCandidate(candidate));
   });
-};
-
-/**
-  #### _handleDataUpdate(pairs, clock, src)
-
-  This is the event handler for the scuttlebutt `update` event.
-**/
-proto._handleDataUpdate = function(pairs, clock, src) {
-  var peer = this.signaller.peers.get(src) || this;
-  this.emit('data:update', pairs[0], pairs[1], peer);
-};
-
-proto._handleDataSync = function() {
-  console.log('synced', arguments);
 };
 
 /**
@@ -370,7 +364,7 @@ proto._handlePeerLeave = function(id) {
   #### _handleSdp
 
 **/
-proto._handleSdp = function(srcInfo, desc) {
+proto._handleSdp = function(desc, srcInfo) {
   // initialise session description and icecandidate objects
   var fail = this.emit.bind(this, 'error');
   var RTCSessionDescription = (this.opts || {}).RTCSessionDescription ||
@@ -504,4 +498,28 @@ proto._negotiate = function(targetId, pc, negotiateFn) {
 
   this._debug('negotiating pc with target ' + targetId);
   negotiateFn.call(pc, haveDescription, fail);
+};
+
+proto._waitForInitialSync = function(roomInfo) {
+  var pendingJoin = roomInfo.memberCount - 1;
+  var pendingSync = pendingJoin;
+  var m = this;
+
+  function handlePeerJoin(data) {
+    pendingJoin -= 1;
+    m.once('sync:' + data.id, handlePeerSync);
+
+    if (pendingJoin <= 0) {
+      m.removeListener('peer:join', handlePeerJoin);
+    }
+  }
+
+  function handlePeerSync() {
+    pendingSync -= 1;
+    if (pendingSync <= 0) {
+      m.emit('sync');
+    }
+  }
+
+  this.on('peer:join', handlePeerJoin);
 };

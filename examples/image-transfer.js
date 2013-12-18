@@ -25,9 +25,9 @@ mesh.join('meshdemo-imagetransfer', function(err, m) {
       console.log('captured read end');
     });
 
-    writer.once('file', function() {
+    writer.once('file', function(file) {
       console.log('detected file end');
-      img.src = detect('URL').createObjectURL(writer.file);
+      img.src = detect('URL').createObjectURL(file);
     });
   });
 
