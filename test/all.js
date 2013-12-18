@@ -2,4 +2,5 @@
 // require('cog/logger').enable('*');
 
 require('./update');
+require('./sync');
 require('./dataline');

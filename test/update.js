@@ -5,7 +5,7 @@ var peers = [];
 var roomId = require('uuid').v4();
 var MAX_PEERS = process.env.MAX_PEERS || 4;
 
-mesh.use('http://rtc.io/switchboard/');
+// mesh.use('http://rtc.io/switchboard/');
 // require('cog/logger').enable('rtc-mesh-smartpeer');
 
 for (var ii = 0; ii < MAX_PEERS; ii++) {
