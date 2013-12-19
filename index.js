@@ -40,9 +40,23 @@ var RTCMeshMember = require('./member');
 /**
   ### join(roomName, opts?, callback)
 
+  This is a helper factory function for creating a new `RTCMeshMember`
+  instance that will join the specified room for the currently configured
+  signalling server.
+
+  ```js
+  require('rtc-mesh').join('testroom', function(err, m) {
+    if (err) {
+      return console.error('error connecting: ', err);
+    }
+
+    console.log('connected to the mesh, id = ' + m.id);
+  });
+  ```
+
 **/
 var join = exports.join = function(roomName, opts, callback) {
-  var peer;
+  var member;
 
   // check for no opts
   if (typeof opts == 'function') {
@@ -53,24 +67,34 @@ var join = exports.join = function(roomName, opts, callback) {
   // ensure we have a callback
   callback = callback || function() {};
 
-  // create a new peer instance
-  peer = new RTCMeshMember(extend({}, opts));
+  // create a new member instance
+  member = new RTCMeshMember(extend({}, opts));
 
   // handle errors during connection
-  peer.on('error', callback);
+  member.on('error', callback);
 
-  // once the peer is online, trigger the callback
-  peer.once('online', function() {
-    peer.removeListener('error', callback);
-    callback(null, peer);
+  // once the member is online, trigger the callback
+  member.once('online', function() {
+    member.removeListener('error', callback);
+    callback(null, member);
   });
 
   // announce
-  peer.announce({ room: roomName });
+  member.announce({ room: roomName });
 };
 
 /**
   ### use(signalhost)
+
+  If you wish to configure a default signalling server to use, then this can
+  be done using the `use` function.  For example if you wanted to use the
+  test rtc.io switchboard for all your connections rather than defaulting to
+  attmepting to use the same origin that your page was served from, use the
+  following code:
+
+  ```js
+  mesh.use('http://rtc.io/switchboard/');
+  ```
 
 **/
 exports.use = function(signalhost) {
