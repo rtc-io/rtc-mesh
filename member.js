@@ -400,7 +400,7 @@ proto._handleSdp = function(desc, srcInfo) {
   new [rtc-dcstream](https://github.com/rtc-io/rtc-dcstream) stream for
   communicating with the target.
 **/
-proto.initDataLine = function(targetId, dc) {
+proto._initDataLine = function(targetId, dc) {
   var m = this;
   var activeStream;
 
