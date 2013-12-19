@@ -191,23 +191,25 @@ proto.close = function() {
   instance that will enable comms.
 
 **/
-proto.to = function(targetId, opts, callback) {
+proto.to = function(targetId, metadata, callback) {
   var dc = this._datalines[targetId];
   var activeStream = this._datastreams[targetId];
   var m = this;
   var dataType;
 
-  if (typeof opts == 'function') {
-    callback = opts;
-    opts = {};
+  if (typeof metadata == 'function') {
+    callback = metadata;
+    metadata = {};
   }
 
-  // initialise the datatype
-  dataType = (opts || {}).type || 'text';
+  // ensure we have default metadata
+  metadata = defaults({}, metadata, {
+    type: 'text'
+  });
 
   function channelReady() {
     // tell the other end to expect a stream
-    dc.send('/stream:' + dataType);
+    dc.send('/stream:' + JSON.stringify(metadata));
 
     // when the stream finishes, clear the reference
     activeStream.once('finish', function() {
@@ -448,6 +450,17 @@ proto._initDataLine = function(targetId, dc) {
 
       if (m._datastreams[targetId]) {
         // TODO: if we have an existing stream from this target, then close it
+      }
+
+      // json parse the metadata
+      if (parts[1]) {
+        try {
+          parts[1] = JSON.parse(parts[1]);
+        }
+        catch (e) {
+          // could not decode parts, set to default
+          parts[1] = { type: 'text' }
+        }
       }
 
       // tell the world about our new stream

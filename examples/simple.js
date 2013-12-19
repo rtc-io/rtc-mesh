@@ -9,7 +9,7 @@ mesh.join('meshdemo-simple', function(err, m) {
     return console.error('could not connect: ', err);
   }
 
-  m.on('data:update', function(key, value) {
+  m.data.on('change', function(key, value) {
     console.log('key: ' + key + ', set to: ', value);
   });
 

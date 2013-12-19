@@ -15,7 +15,7 @@ mesh.join('meshdemo-imagetransfer', function(err, m) {
     return console.error('could not connect: ', err);
   }
 
-  m.on('datastream', function(srcId, stream, type) {
+  m.on('datastream', function(srcId, stream, metadata) {
     var writer = filestream.write();
 
     console.log('receiving file from: ' + srcId);
