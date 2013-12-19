@@ -54,7 +54,31 @@ Tested Chrome 32 <==> Firefox 26 and it works nicely :)
 
 ### join(roomName, opts?, callback)
 
+This is a helper factory function for creating a new `RTCMeshMember`
+instance that will join the specified room for the currently configured
+signalling server.
+
+```js
+require('rtc-mesh').join('testroom', function(err, m) {
+  if (err) {
+    return console.error('error connecting: ', err);
+  }
+
+  console.log('connected to the mesh, id = ' + m.id);
+});
+```
+
 ### use(signalhost)
+
+If you wish to configure a default signalling server to use, then this can
+be done using the `use` function.  For example if you wanted to use the
+test rtc.io switchboard for all your connections rather than defaulting to
+attmepting to use the same origin that your page was served from, use the
+following code:
+
+```js
+mesh.use('http://rtc.io/switchboard/');
+```
 
 ### RTCMeshMember(attributes, opts)
 
