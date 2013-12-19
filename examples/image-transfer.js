@@ -50,7 +50,7 @@ mesh.join('meshdemo-imagetransfer', function(err, m) {
   }
 
   dnd(document.body, function(files) {
-    m.signaller.peers.keys().forEach(upload(files));
+    m.peers.forEach(upload(files));
   });
 
   document.body.appendChild(crel('style', 'body, html { margin: 0; width: 100%; height: 100% }'));
