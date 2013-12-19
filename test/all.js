@@ -5,3 +5,4 @@ require('./peers-tracking');
 require('./update');
 require('./sync');
 require('./dataline');
+require('./datastreams');
