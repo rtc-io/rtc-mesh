@@ -58,27 +58,69 @@ Tested Chrome 32 <==> Firefox 26 and it works nicely :)
 
 ### RTCMeshMember(attributes, opts)
 
+An `RTCMeshMember` instance is returned when you successfully join
+a mesh.  The member instance provides methods that enable to you communicate
+with your fellow peers and a `data` object that is a
+[scuttlebutt Model](https://github.com/dominictarr/scuttlebutt#scuttlebuttmodel)
+instance (by default) that can be used to update the shared mesh data state.
+
 #### announce(data)
 
-Announce ourselves to the global signaller
+Announce ourselves to the global signaller.  If you used the `join` function
+exported by `rtc-mesh` then this is called for you automatically.  You can,
+however, call the method again if you wish to update any of your signalling
+specific data requires updating.
 
 #### close()
 
-#### expandMesh(targetId, dc)
+Close our connection to the mesh.
 
-#### getChannel(targetId)
+#### to(targetId, callback)
 
-#### getConnection(targetId)
+Using the dataline between this member and the target, create a stream
+instance that will enable comms.
 
 ### RTCMesh internal methods
 
-#### _handleDataUpdate(pairs, clock, src)
+#### _debug(message)
 
-This is the event handler for the scuttlebutt `update` event.
+Internal debug logging method that attaches our peer id to log messages
 
-#### _handlePeer
+#### _expandMesh(targetId, dc)
+
+This method is called when we have either created or been notified about
+a new state datachannel for a particular target. The method is responsible
+for propertly connecting our shared `data` instance to the channel to ensure
+that it remains in sync correctly.
+
+#### _handleCandidates(candidates, srcInfo)
+
+This is an event handler that deals with ICE candidates communicated during
+the initial peer connection signalling for the base mesh peer connection.
+
+#### _handlePeerAnnounce
+
+An event handler for responding to `peer:announce` events from the signaller.
+
+#### _handlePeerLeave
+
+An event handler for responding to `peer:leave` events from the signaller.
 
 #### _handleSdp
+
+An event handler for reacting to SDP that is sent via the signaller for our
+base mesh peer connection setup.
+
+#### _initDataLine(targetId, dc)
+
+This method is used to properly initialise the datachannel that will be
+used for sending data streams across to the specified target.  The dataline
+is a separate data channel from the p2p state management channel an is
+designed to be used for adhoc data / file communications between targets.
+
+To access the dataline of a connection, use the `to` method to get a
+new [rtc-dcstream](https://github.com/rtc-io/rtc-dcstream) stream for
+communicating with the target.
 
 #### _initPeerConnection(targetId)
 
@@ -88,6 +130,13 @@ also handles basic initialization of the peer connection.
 #### _negotiate(targetId, pc, negotiateFn)
 
 Used to handle the `createOffer` or `createAnswer` interaction.
+
+#### _waitForInitialSync(roomInfo)
+
+An event handler that is responsible for waiting for a `roominfo` message
+from the signaller. Once the mesh member receives this message it is able
+to determine how many peers it needs to wait for to achieve data
+synchronization.
 
 ## License(s)
 

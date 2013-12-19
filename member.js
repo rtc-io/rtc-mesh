@@ -16,6 +16,13 @@ var util = require('util');
 
 /**
   ### RTCMeshMember(attributes, opts)
+
+  An `RTCMeshMember` instance is returned when you successfully join
+  a mesh.  The member instance provides methods that enable to you communicate
+  with your fellow peers and a `data` object that is a
+  [scuttlebutt Model](https://github.com/dominictarr/scuttlebutt#scuttlebuttmodel)
+  instance (by default) that can be used to update the shared mesh data state.
+
 **/
 function RTCMeshMember(opts) {
   if (! (this instanceof RTCMeshMember)) {
@@ -72,7 +79,11 @@ var proto = RTCMeshMember.prototype;
 /**
   #### announce(data)
 
-  Announce ourselves to the global signaller
+  Announce ourselves to the global signaller.  If you used the `join` function
+  exported by `rtc-mesh` then this is called for you automatically.  You can,
+  however, call the method again if you wish to update any of your signalling
+  specific data requires updating.
+
 **/
 proto.announce = function(data) {
   var m = this;
@@ -140,6 +151,9 @@ proto.broadcast = function(mediaStream, opts) {
 
 /**
   #### close()
+
+  Close our connection to the mesh.
+
 **/
 proto.close = function() {
   // reset peers
@@ -150,100 +164,6 @@ proto.close = function() {
     this.socket.end();
     this.socket = null;
   }
-};
-
-/**
-  #### expandMesh(targetId, dc)
-**/
-proto.expandMesh = function(targetId, dc) {
-  // create a new stream
-  var stream = dcstream(dc);
-  var peer = this;
-  var reader = this.data.createReadStream();
-  var writer = this.data.createWriteStream();
-
-  this._debug('new data channel available for target: ' + targetId);
-
-  // set the dc binary type to arraybuffer
-  dc.binaryType = 'arraybuffer';
-
-  // register the channel
-  this._channels[targetId] = dc;
-
-  stream.on('error', function(err) {
-    console.log('captured stream error: ', err.message)
-  });
-
-  // connect the stream to the data
-  reader.pipe(stream).pipe(writer);
-
-  // bubble sync events
-  writer.on('sync', this.emit.bind(this, 'sync:' + targetId));
-
-  // stream.pipe(dataStream).pipe(stream);
-  this._debug('data synchronization in progress');
-};
-
-/**
-  #### getChannel(targetId)
-**/
-proto.getChannel = function(targetId) {
-  return this._channels[targetId];
-};
-
-/**
-  #### getConnection(targetId)
-**/
-proto.getConnection = function(targetId) {
-  return this._connections[targetId];
-};
-
-/**
-  #### initDataLine(targetId, dc)
-**/
-proto.initDataLine = function(targetId, dc) {
-  var m = this;
-  var activeStream;
-
-  function handleMessage(evt) {
-    var parts = (evt && typeof evt.data == 'string') ? evt.data.split(':') : [];
-    if (parts[0] === '/stream') {
-      activeStream = dcstream(dc);
-
-      if (m._datastreams[targetId]) {
-        // TODO: if we have an existing stream from this target, then close it
-      }
-
-      // tell the world about our new stream
-      m.emit('datastream:' + targetId, activeStream, parts[1]);
-      m.emit('datastream', targetId, activeStream, parts[1]);
-      m._datastreams[targetId] = activeStream;
-
-      // activeStream.once('end', function() {
-      //   console.log('stream ended');
-      // });
-
-      // activeStream.once('close', function() {
-      //   console.log('stream closed');
-      // });
-
-      // activeStream.once('finish', function() {
-      //   console.log('stream finished');
-      // });
-    }
-  }
-
-  // set the dc binary type to arraybuffer
-  dc.binaryType = 'arraybuffer';
-
-  // listen for messages on the dataline
-  dc.addEventListener('message', handleMessage);
-
-  // save a reference to the dataline
-  this._datalines[targetId] = dc;
-
-  // trigger the dataline availability event
-  this.emit('dataline:' + targetId, dc);
 };
 
 /**
@@ -311,6 +231,62 @@ proto.to = function(targetId, opts, callback) {
   ### RTCMesh internal methods
 **/
 
+/**
+  #### _debug(message)
+
+  Internal debug logging method that attaches our peer id to log messages
+**/
+proto._debug = function(message) {
+  var extra = [].slice.call(arguments, 1);
+
+  debug.apply(debug, [this.id + ' ' + message].concat(extra));
+};
+
+/**
+  #### _expandMesh(targetId, dc)
+
+  This method is called when we have either created or been notified about
+  a new state datachannel for a particular target. The method is responsible
+  for propertly connecting our shared `data` instance to the channel to ensure
+  that it remains in sync correctly.
+
+**/
+proto._expandMesh = function(targetId, dc) {
+  // create a new stream
+  var stream = dcstream(dc);
+  var peer = this;
+  var reader = this.data.createReadStream();
+  var writer = this.data.createWriteStream();
+
+  this._debug('new data channel available for target: ' + targetId);
+
+  // set the dc binary type to arraybuffer
+  dc.binaryType = 'arraybuffer';
+
+  // register the channel
+  this._channels[targetId] = dc;
+
+  stream.on('error', function(err) {
+    console.log('captured stream error: ', err.message)
+  });
+
+  // connect the stream to the data
+  reader.pipe(stream).pipe(writer);
+
+  // bubble sync events
+  writer.on('sync', this.emit.bind(this, 'sync:' + targetId));
+
+  // stream.pipe(dataStream).pipe(stream);
+  this._debug('data synchronization in progress');
+};
+
+/**
+  #### _handleCandidates(candidates, srcInfo)
+
+  This is an event handler that deals with ICE candidates communicated during
+  the initial peer connection signalling for the base mesh peer connection.
+
+**/
 proto._handleCandidates = function(candidates, srcInfo) {
   var pc = srcInfo && this._connections[srcInfo.id]
   var m = this;
@@ -342,8 +318,9 @@ proto._handleCandidates = function(candidates, srcInfo) {
 };
 
 /**
-  #### _handlePeer
+  #### _handlePeerAnnounce
 
+  An event handler for responding to `peer:announce` events from the signaller.
 **/
 proto._handlePeerAnnounce = function(data) {
   // ensure the new peer is valid
@@ -365,6 +342,11 @@ proto._handlePeerAnnounce = function(data) {
   this.emit('peer:announce', data);
 };
 
+/**
+  #### _handlePeerLeave
+
+  An event handler for responding to `peer:leave` events from the signaller.
+**/
 proto._handlePeerLeave = function(id) {
   // remove the peer from the peers array
   this.peers = this.peers.filter(function(testId) {
@@ -377,6 +359,8 @@ proto._handlePeerLeave = function(id) {
 /**
   #### _handleSdp
 
+  An event handler for reacting to SDP that is sent via the signaller for our
+  base mesh peer connection setup.
 **/
 proto._handleSdp = function(desc, srcInfo) {
   // initialise session description and icecandidate objects
@@ -404,10 +388,61 @@ proto._handleSdp = function(desc, srcInfo) {
   );
 };
 
-proto._debug = function(message) {
-  var extra = [].slice.call(arguments, 1);
+/**
+  #### _initDataLine(targetId, dc)
 
-  debug.apply(debug, [this.id + ' ' + message].concat(extra));
+  This method is used to properly initialise the datachannel that will be
+  used for sending data streams across to the specified target.  The dataline
+  is a separate data channel from the p2p state management channel an is
+  designed to be used for adhoc data / file communications between targets.
+
+  To access the dataline of a connection, use the `to` method to get a
+  new [rtc-dcstream](https://github.com/rtc-io/rtc-dcstream) stream for
+  communicating with the target.
+**/
+proto.initDataLine = function(targetId, dc) {
+  var m = this;
+  var activeStream;
+
+  function handleMessage(evt) {
+    var parts = (evt && typeof evt.data == 'string') ? evt.data.split(':') : [];
+    if (parts[0] === '/stream') {
+      activeStream = dcstream(dc);
+
+      if (m._datastreams[targetId]) {
+        // TODO: if we have an existing stream from this target, then close it
+      }
+
+      // tell the world about our new stream
+      m.emit('datastream:' + targetId, activeStream, parts[1]);
+      m.emit('datastream', targetId, activeStream, parts[1]);
+      m._datastreams[targetId] = activeStream;
+
+      // activeStream.once('end', function() {
+      //   console.log('stream ended');
+      // });
+
+      // activeStream.once('close', function() {
+      //   console.log('stream closed');
+      // });
+
+      // activeStream.once('finish', function() {
+      //   console.log('stream finished');
+      // });
+    }
+  }
+
+  // set the dc binary type to arraybuffer
+  dc.binaryType = 'arraybuffer';
+
+  // listen for messages on the dataline
+  dc.addEventListener('message', handleMessage);
+
+  // save a reference to the dataline
+  this._datalines[targetId] = dc;
+
+  // trigger the dataline availability event
+  this.emit('dataline:' + targetId, dc);
 };
 
 /**
@@ -439,10 +474,10 @@ proto._initPeerConnection = function(targetId, peerData) {
   // data channel
   if (peerData.roleIdx === 0) {
     // create the data line data channel
-    this.initDataLine(targetId, pc.createDataChannel('dataline'));
+    this._initDataLine(targetId, pc.createDataChannel('dataline'));
 
     // create the synchronization state channel used by scuttlebutt
-    this.expandMesh(targetId, pc.createDataChannel('syncstate'));
+    this._expandMesh(targetId, pc.createDataChannel('syncstate'));
 
     // negotiate connections
     this._negotiate(targetId, pc, pc.createOffer);
@@ -456,13 +491,13 @@ proto._initPeerConnection = function(targetId, peerData) {
 
       switch (evt.channel.label) {
         case 'syncstate': {
-          m.expandMesh(targetId, evt.channel);
+          m._expandMesh(targetId, evt.channel);
           break;
         }
 
         case 'dataline': {
           m._debug('received dataline from ' + targetId);
-          m.initDataLine(targetId, evt.channel);
+          m._initDataLine(targetId, evt.channel);
         }
       }
     };
@@ -514,6 +549,14 @@ proto._negotiate = function(targetId, pc, negotiateFn) {
   negotiateFn.call(pc, haveDescription, fail);
 };
 
+/**
+  #### _waitForInitialSync(roomInfo)
+
+  An event handler that is responsible for waiting for a `roominfo` message
+  from the signaller. Once the mesh member receives this message it is able
+  to determine how many peers it needs to wait for to achieve data
+  synchronization.
+**/
 proto._waitForInitialSync = function(roomInfo) {
   var pendingJoin = roomInfo.memberCount - 1;
   var pendingSync = pendingJoin;
