@@ -144,9 +144,27 @@ proto.announce = function(data) {
   });
 };
 
-proto.broadcast = function(mediaStream, opts) {
+/**
+  #### broadcast(streams, opts)
+
+  Broadcast one or more streams to all active peers within the mesh or to
+  specified targets within the `opts`.
+
+**/
+proto.broadcast = function(streams, opts) {
   // get the targets that we are streaming to
-  var targets = (opts || {}).targets;
+  var targets = (opts || {}).targets || this.peers;
+  var m = this;
+
+  // ensure we have an array for streams
+  streams = [].concat(streams || []);
+
+  // iterate through the targets, create the negotiation streams as required
+  targets.forEach(function(targetId) {
+    // request a datastream to the target
+    m.to(targetId, { type: 'negotiation' }, function(err, ds) {
+    });
+  });
 };
 
 /**
@@ -204,9 +222,24 @@ proto.to = function(targetId, opts, callback) {
     callback(null, activeStream);
   }
 
+  function clearActiveStream() {
+    activeStream = m._datastreams[targetId] = null;
+    m.emit('stream:release', targetId);
+  }
+
+  function waitForStreamRelease(releasedId) {
+    if (releasedId === targetId) {
+      m.removeListener('stream:release', waitForStreamRelease);
+
+      // try again
+      m.to(targetId, opts, callback);
+    }
+  }
+
   // if we already have an active stream, then report an error
+  // TODO: wait for the stream to close and then retry
   if (activeStream) {
-    return callback(new Error('active stream already open to target: ' + targetId));
+    return this.on('stream:release', waitForStreamRelease);
   }
 
   // if the data channel does not exist, then abort
@@ -218,6 +251,10 @@ proto.to = function(targetId, opts, callback) {
 
   // create the stream
   activeStream = m._datastreams[targetId] = dcstream(dc);
+
+  // active stream on the finish
+  activeStream.on('finish', clearActiveStream);
+  activeStream.on('end', clearActiveStream);
 
   // wait for open
   if (dc.readyState !== 'open') {
