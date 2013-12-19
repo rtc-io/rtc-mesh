@@ -133,10 +133,19 @@ proto.announce = function(data) {
   });
 };
 
+proto.broadcast = function(mediaStream, opts) {
+  // get the targets that we are streaming to
+  var targets = (opts || {}).targets;
+};
+
 /**
   #### close()
 **/
 proto.close = function() {
+  // reset peers
+  this.peers = [];
+
+  // close the socket connection
   if (this.socket) {
     this.socket.end();
     this.socket = null;
@@ -349,15 +358,20 @@ proto._handlePeerAnnounce = function(data) {
     this.signaller.peers.get(data.id)
   );
 
-  // create the peer
-  // var peer = this.peers[data.id] = dataslice(this.data, data.id);
+  // add this peer to the peers array
+  this.peers.push(data.id);
 
-  // trigger the peer:join event
-  this.emit('peer:join', data);
+  // trigger the peer:announce event
+  this.emit('peer:announce', data);
 };
 
 proto._handlePeerLeave = function(id) {
+  // remove the peer from the peers array
+  this.peers = this.peers.filter(function(testId) {
+    return testId !== id;
+  });
 
+  this.emit('peer:leave', id);
 };
 
 /**
@@ -505,12 +519,12 @@ proto._waitForInitialSync = function(roomInfo) {
   var pendingSync = pendingJoin;
   var m = this;
 
-  function handlePeerJoin(data) {
+  function handlePeerAnnounce(data) {
     pendingJoin -= 1;
     m.once('sync:' + data.id, handlePeerSync);
 
     if (pendingJoin <= 0) {
-      m.removeListener('peer:join', handlePeerJoin);
+      m.removeListener('peer:announce', handlePeerAnnounce);
     }
   }
 
@@ -521,5 +535,5 @@ proto._waitForInitialSync = function(roomInfo) {
     }
   }
 
-  this.on('peer:join', handlePeerJoin);
+  this.on('peer:announce', handlePeerAnnounce);
 };
