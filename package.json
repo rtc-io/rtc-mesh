@@ -30,7 +30,8 @@
     "rtc-signaller": "~0.13.0",
     "rtc-core": "~0.7.1",
     "async": "~0.2.9",
-    "rtc-dcstream": "~0.4.0"
+    "rtc-dcstream": "~0.4.0",
+    "through": "~2.3.4"
   },
   "devDependencies": {
     "tape": "~2.3.0",
@@ -40,6 +41,7 @@
     "zuul": "~1.0.7",
     "crel": "~1.1.0",
     "drag-and-drop-files": "0.0.1",
-    "filestream": "~0.4.0"
+    "filestream": "~0.4.0",
+    "rtc-media": "~1.5.0"
   }
 }

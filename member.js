@@ -11,6 +11,7 @@ var sig = require('rtc-signaller');
 var dcstream = require('rtc-dcstream');
 var ScuttleButt = require('scuttlebutt');
 var Model = require('scuttlebutt/model');
+var Broadcast = require('./broadcast');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
@@ -48,6 +49,9 @@ function RTCMeshMember(opts) {
   this._datalines = {};
   this._datastreams = {};
 
+  // initialise a broadcasts hash
+  this._broadcasts = {};
+
   // if we have been provided an alternatve scuttlebutt implementation
   // use that
   if (opts.data instanceof ScuttleButt) {
@@ -70,6 +74,9 @@ function RTCMeshMember(opts) {
 
   // initialise the signalling host (fall back to the origin if default not set)
   this.signalhost = opts.signalhost || location.origin;
+
+  // listen for others attempting to broadcast to use
+  this.on('datastream', this._monitorIncomingBroadcasts.bind(this));
 }
 
 util.inherits(RTCMeshMember, EventEmitter);
@@ -154,15 +161,27 @@ proto.announce = function(data) {
 proto.broadcast = function(streams, opts) {
   // get the targets that we are streaming to
   var targets = (opts || {}).targets || this.peers;
+  var label = (opts || {}).label || 'primary';
   var m = this;
-
-  // ensure we have an array for streams
-  streams = [].concat(streams || []);
 
   // iterate through the targets, create the negotiation streams as required
   targets.forEach(function(targetId) {
     // request a datastream to the target
-    m.to(targetId, { type: 'negotiation' }, function(err, ds) {
+    m.to(targetId, { type: 'broadcast' }, function(err, ds) {
+      var broadcastKey = targetId + ':' + label;
+      var bc = m._broadcasts[broadcastKey];
+
+      // if we don't have an existing broadcast connection, create a new one
+      if (! bc) {
+        bc = m._broadcasts[broadcastKey] = new Broadcast(label, m);
+      }
+
+      // pipe
+      bc.reader().pipe(ds).pipe(bc.writer());
+
+      // update the streams for the broadcast
+      // this will trigger the offer sequence
+      bc.streams = [].concat(streams || []);
     });
   });
 };
@@ -209,7 +228,7 @@ proto.to = function(targetId, metadata, callback) {
 
   function channelReady() {
     // tell the other end to expect a stream
-    dc.send('/stream:' + JSON.stringify(metadata));
+    dc.send('/stream|' + JSON.stringify(metadata));
 
     // when the stream finishes, clear the reference
     activeStream.once('finish', function() {
@@ -444,7 +463,7 @@ proto._initDataLine = function(targetId, dc) {
   var activeStream;
 
   function handleMessage(evt) {
-    var parts = (evt && typeof evt.data == 'string') ? evt.data.split(':') : [];
+    var parts = (evt && typeof evt.data == 'string') ? evt.data.split('|') : [];
     if (parts[0] === '/stream') {
       activeStream = dcstream(dc);
 
@@ -459,6 +478,7 @@ proto._initDataLine = function(targetId, dc) {
         }
         catch (e) {
           // could not decode parts, set to default
+          debug('error parsing dataline metadata from: ' + targetId, e);
           parts[1] = { type: 'text' }
         }
       }
@@ -573,6 +593,20 @@ proto._initPeerConnection = function(targetId, peerData) {
   };
 
   return pc;
+};
+
+/**
+  #### _monitorIncomingBroadcasts
+
+  This method responds to incoming datastream events and checks to see
+  if it is a negotiate type stream. If so we need to create a broadcast
+  receiver.
+
+**/
+proto._monitorIncomingBroadcasts = function(targetId, ds, metadata) {
+  if (metadata && metadata.type == 'broadcast') {
+    console.log('found incoming broadcast from target: ' + targetId);
+  }
 };
 
 /**
