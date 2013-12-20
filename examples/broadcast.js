@@ -14,21 +14,28 @@ mesh.join('mesh-broadcast-test', function(err, m) {
     return console.error('could not connect: ', err);
   }
 
+  m.on('broadcast', function(srcId, label, streams) {
+    var videos = [];
+
+    streams.forEach(function(stream) {
+      media(stream).render(videos[videos.length] = crel('video'));
+    })
+
+    videos.forEach(function(vid) {
+      document.body.appendChild(vid);
+    });
+
+    m.once('endbroadcast:' + srcId + ':' + label, function() {
+      videos.forEach(function(vid) {
+        document.body.removeChild(vid);
+      });
+    });
+  });
+
   // capture local video and broadcast
   media()
-    .once('capture', function(stream) {
-      m.broadcast(stream);
-    })
+    .once('capture', m.broadcast.bind(m))
     .render(localVideo);
-
-  m.on('broadcast', function(srcId, streams, metadata) {
-    streams.forEach(function(stream) {
-      var vid;
-
-      media(stream).render(vid = crel('video'));
-      document.body.appendChild(vid);
-    })
-  });
 
   document.body.appendChild(localVideo);
 });

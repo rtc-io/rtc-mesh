@@ -166,9 +166,12 @@ proto.broadcast = function(streams, opts) {
 
   function createBroadcast(targetId) {
     // request a datastream to the target
+    debug('requesting broadcast stream to: ' + targetId);
     m.to(targetId, { type: 'broadcast', label: label }, function(err, ds) {
       var broadcastKey = targetId + ':' + label;
       var bc = m._broadcasts[broadcastKey];
+
+      debug('broadcast stream created, initializing broadcast');
 
       // if we don't have an existing broadcast connection, create a new one
       if (! bc) {
@@ -176,7 +179,7 @@ proto.broadcast = function(streams, opts) {
       }
 
       // pipe
-      bc.reader().pipe(ds).pipe(bc.writer());
+      bc.data.pipe(ds).pipe(bc.data);
 
       // update the streams for the broadcast
       // this will trigger the offer sequence
@@ -191,7 +194,7 @@ proto.broadcast = function(streams, opts) {
   this.on('peer:announce', function(data) {
     var validTarget = (targets || m.peers).indexOf(data.id) >= 0;
 
-    debug('new peer joined: ', data.id);
+    debug('new peer joined: ' + data.id + ', valid = ' + validTarget);
     if (validTarget) {
       createBroadcast(data.id);
     }
@@ -240,24 +243,11 @@ proto.to = function(targetId, metadata, callback) {
 
   function channelReady() {
     // tell the other end to expect a stream
+    debug('sending stream notification with metadata: ', metadata);
     dc.send('/stream|' + JSON.stringify(metadata));
-
-    // when the stream finishes, clear the reference
-    activeStream.once('finish', function() {
-      m._debug('outbound stream to ' + targetId + ' finished');
-      if (m._datastreams[targetId] === activeStream) {
-        m._debug('released stream reference to: ' + targetId);
-        m._datastreams[targetId] = null;
-      }
-    });
 
     // create the stream and trigger the callback
     callback(null, activeStream);
-  }
-
-  function clearActiveStream() {
-    activeStream = m._datastreams[targetId] = null;
-    m.emit('stream:release', targetId);
   }
 
   function waitForStreamRelease(releasedId) {
@@ -265,20 +255,21 @@ proto.to = function(targetId, metadata, callback) {
       m.removeListener('stream:release', waitForStreamRelease);
 
       // try again
-      m.to(targetId, opts, callback);
+      m.to(targetId, metadata, callback);
     }
   }
 
   // if we already have an active stream, then report an error
   // TODO: wait for the stream to close and then retry
   if (activeStream) {
+    debug('stream active to ' + targetId + ', waiting for release');
     return this.on('stream:release', waitForStreamRelease);
   }
 
   // if the data channel does not exist, then abort
   if (! dc) {
     return this.once('dataline:' + targetId, function() {
-      m.to(targetId, callback);
+      m.to(targetId, metadata, callback);
     });
   }
 
@@ -286,8 +277,8 @@ proto.to = function(targetId, metadata, callback) {
   activeStream = m._datastreams[targetId] = dcstream(dc);
 
   // active stream on the finish
-  activeStream.on('finish', clearActiveStream);
-  activeStream.on('end', clearActiveStream);
+  activeStream.on('finish', m._releaseStream(targetId));
+  activeStream.on('end', m._releaseStream(targetId));
 
   // wait for open
   if (dc.readyState !== 'open') {
@@ -424,6 +415,7 @@ proto._handlePeerLeave = function(id) {
   });
 
   this.emit('peer:leave', id);
+  this.emit('peer:leave:' + id);
 };
 
 /**
@@ -478,6 +470,8 @@ proto._initDataLine = function(targetId, dc) {
     var parts = (evt && typeof evt.data == 'string') ? evt.data.split('|') : [];
     if (parts[0] === '/stream') {
       activeStream = dcstream(dc);
+      activeStream.on('end', m._releaseStream(targetId));
+      activeStream.on('finish', m._releaseStream(targetId));
 
       if (m._datastreams[targetId]) {
         // TODO: if we have an existing stream from this target, then close it
@@ -632,13 +626,26 @@ proto._monitorIncomingBroadcasts = function(srcId, ds, metadata) {
   var pc = new RTCPeerConnection(config);
 
   // receive the stream
+  debug('received a broadcast from ' + srcId + ', label: ' + metadata.label);
   Broadcast.receive(pc, ds, this.opts, function(err, streams) {
     if (err) {
       return debug('received a stream, but encountered an error', err);
     }
 
     debug('received a broadcast from ' + srcId + ', streams: ', streams);
-    m.emit('broadcast', srcId, streams, metadata);
+    m.emit('broadcast', srcId, metadata.label, streams);
+
+    // if the connection is closed, remove the video
+    pc.oniceconnectionstatechange = function() {
+      debug('received connection state update for stream ' + srcId + ':' + metadata.label + ', state = ' + pc.iceConnectionState);
+      if (pc.iceConnectionState === 'disconnected') {
+        m.emit('endbroadcast:' + srcId + ':' + metadata.label);
+      }
+    };
+
+    m.once('peer:leave:' + srcId, function() {
+      m.emit('endbroadcast:' + srcId + ':' + metadata.label);
+    });
   })
 };
 
@@ -664,6 +671,19 @@ proto._negotiate = function(targetId, pc, negotiateFn) {
 
   this._debug('negotiating pc with target ' + targetId);
   negotiateFn.call(pc, haveDescription, fail);
+};
+
+proto._releaseStream = function(targetId) {
+  var m = this;
+
+  return function() {
+    m._debug('stream to ' + targetId + ' finished');
+    if (m._datastreams[targetId] === this) {
+      m._debug('released stream reference to: ' + targetId);
+      m._datastreams[targetId] = null;
+      m.emit('stream:release', targetId);
+    }
+  };
 };
 
 /**

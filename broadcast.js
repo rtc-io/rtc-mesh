@@ -22,9 +22,8 @@ function Broadcast(label, src) {
   this.label = label;
   this.src = src;
 
-  // initilaise the inbound and outbound stream
-  this._in = null;
-  this._out = null;
+  // initialise the data stream
+  this.data = through();
 }
 
 util.inherits(Broadcast, EventEmitter);
@@ -47,32 +46,6 @@ Object.defineProperty(proto, 'streams', {
     this._createOffer();
   }
 });
-
-/**
-  #### reader()
-
-  Create a readable stream for that will provide offer handshake information
-  that has been collected during the peer connection negotiation.
-**/
-proto.reader = function() {
-  // create the reader
-  this._out = through();
-  this.emit('outbound', this._out);
-
-  return this._out;
-};
-
-/**
-  #### writer()
-
-  Create a writer stream for responding to
-**/
-proto.writer = function() {
-  this._in = through();
-  this.emit('inbound', this._in);
-
-  return this._in;
-};
 
 /**
   #### _answer(pc, data)
@@ -165,6 +138,13 @@ proto._createPeerConnection = function() {
     }
   });
 
+  function monitorConnectionOK() {
+    if (pc.iceConnectionState === 'connected') {
+      pc.oniceconnectionstatechange = null;
+      bc.data.end();
+    }
+  }
+
   // when we receive ice candidates, send them over the outbound connection
   pc.onicecandidate = function(evt) {
     if (evt.candidate) {
@@ -176,14 +156,9 @@ proto._createPeerConnection = function() {
   };
 
   // listen for incoming data
-  if (this._in) {
-    this._in.on('data', this._handleIncomingData.bind(this));
-  }
-  else {
-    this.once('inbound', function(stream) {
-      stream.on('data', this._handleIncomingData.bind(this));
-    });
-  }
+  this.data.on('data', this._handleIncomingData.bind(this));
+
+  pc.oniceconnectionstatechange = monitorConnectionOK;
 
   return pc;
 }
@@ -219,13 +194,6 @@ proto._send = function(type, payload) {
     type: type
   });
 
-  if (this._out) {
-    debug('sending payload via broadcast stream: ', payload);
-    return this._out.write(JSON.stringify(payload));
-  }
-
-  // if we don't have the outbound stream, then wait
-  this.once('outbound', function(stream) {
-    stream.write(JSON.stringify(payload));
-  });
+  debug('sending payload via broadcast stream: ', payload);
+  this.data.write(JSON.stringify(payload));
 };

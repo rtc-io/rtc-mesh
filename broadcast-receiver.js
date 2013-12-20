@@ -22,6 +22,7 @@ module.exports = function(pc, ds, opts, callback) {
   function abort(err) {
     debug('error receiving broadcast: ', err);
     write('error', err);
+    ds.end();
   }
 
   function answerReady(desc) {
@@ -39,7 +40,12 @@ module.exports = function(pc, ds, opts, callback) {
   function checkConnectionState() {
     debug('connection state changed to: ' + pc.iceConnectionState);
     if (pc.iceConnectionState === 'connected') {
+      // remove the handler
       pc.oniceconnectionstatechange = null;
+
+      // end the datastream
+      ds.end();
+
       return callback(null, pc.getRemoteStreams());
     }
   }
