@@ -31,9 +31,12 @@ util.inherits(Broadcast, EventEmitter);
 module.exports = Broadcast;
 var proto = Broadcast.prototype;
 
+// patch in a static receive function
+Broadcast.receive = require('./broadcast-receiver');
+
 Object.defineProperty(proto, 'streams', {
   set: function(value) {
-    var pc = this.pc = this._createPeerConnection();
+    var pc = this._createPeerConnection();
 
     // add the streams to the peer connection
     [].concat(value || []).forEach(function(stream) {
@@ -69,6 +72,53 @@ proto.writer = function() {
   this.emit('inbound', this._in);
 
   return this._in;
+};
+
+/**
+  #### _answer(pc, data)
+
+**/
+proto._answer = function(pc, data) {
+  var RTCSessionDescription = (this.src.opts || {}).RTCSessionDescription ||
+    detect('RTCSessionDescription');
+
+  // set the remote description for the connection
+  pc.setRemoteDescription(
+    new RTCSessionDescription(data),
+
+    function() {
+      debug('successfully set remote description');
+    },
+
+    function(err) {
+      debug('error setting remote description for peer connection: ', err);
+    }
+  );
+};
+
+/**
+  #### _candidates(pc, data)
+
+**/
+proto._candidates = function(pc, data) {
+  var broadcast = this;
+  var RTCIceCandidate = (this.src.opts || {}).RTCIceCandidate ||
+    detect('RTCIceCandidate');
+
+  if (! pc.remoteDescription) {
+    pc.onsignalingstatechange = function() {
+      if (pc.signalingState === 'stable') {
+        broadcast._candidates(pc, data);
+      }
+    }
+
+    return;
+  }
+
+  debug('setting remote candidates: ', data.candidates);
+  data.candidates.forEach(function(candidate) {
+    pc.addIceCandidate(new RTCIceCandidate(candidate));
+  });
 };
 
 /**
@@ -108,7 +158,7 @@ proto._createPeerConnection = function() {
 
   // create the peer connection
   debug('creating new peer connection');
-  var pc = new RTCPeerConnection(config, {
+  var pc = this.pc = new RTCPeerConnection(config, {
     mandatory: {
       OfferToReceiveVideo: false,
       OfferToReceiveAudio: false
@@ -118,15 +168,50 @@ proto._createPeerConnection = function() {
   // when we receive ice candidates, send them over the outbound connection
   pc.onicecandidate = function(evt) {
     if (evt.candidate) {
-      candidates.push(evt.candidates);
+      candidates.push(evt.candidate);
     }
     else {
       bc._send('candidates', { candidates: candidates });
     }
   };
 
+  // listen for incoming data
+  if (this._in) {
+    this._in.on('data', this._handleIncomingData.bind(this));
+  }
+  else {
+    this.once('inbound', function(stream) {
+      stream.on('data', this._handleIncomingData.bind(this));
+    });
+  }
+
   return pc;
 }
+
+proto._handleIncomingData = function(chunk) {
+  var handler;
+
+  // if we don't have a peer connection, abort
+  if (! this.pc) {
+    return debug('no peer connection, cannot process data');
+  }
+
+  // try and parse the chunk
+  try {
+    chunk = JSON.parse(chunk);
+  }
+  catch (e) {
+    return debug('unable to parse incoming chunk: ' + chunk, e);
+  }
+
+  // look for a handler to match the message type
+  handler = this['_' + chunk.type];
+
+  // if we have a handler, invoke it
+  if (typeof handler == 'function') {
+    handler.call(this, this.pc, chunk);
+  }
+};
 
 proto._send = function(type, payload) {
   // add the type to the payload
@@ -135,6 +220,7 @@ proto._send = function(type, payload) {
   });
 
   if (this._out) {
+    debug('sending payload via broadcast stream: ', payload);
     return this._out.write(JSON.stringify(payload));
   }
 

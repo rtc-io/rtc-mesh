@@ -4,7 +4,7 @@ var media = require('rtc-media');
 
 // use the demo rtc.io signalling server
 mesh.use('http://rtc.io/switchboard/');
-require('cog/logger').enable('rtc-mesh-broadcast');
+require('cog/logger').enable('rtc-mesh', 'rtc-mesh-broadcast', 'rtc-mesh-receiver');
 
 var localVideo = crel('video');
 
@@ -20,6 +20,15 @@ mesh.join('mesh-broadcast-test', function(err, m) {
       m.broadcast(stream);
     })
     .render(localVideo);
+
+  m.on('broadcast', function(srcId, streams, metadata) {
+    streams.forEach(function(stream) {
+      var vid;
+
+      media(stream).render(vid = crel('video'));
+      document.body.appendChild(vid);
+    })
+  });
 
   document.body.appendChild(localVideo);
 });

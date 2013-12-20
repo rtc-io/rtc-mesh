@@ -160,14 +160,13 @@ proto.announce = function(data) {
 **/
 proto.broadcast = function(streams, opts) {
   // get the targets that we are streaming to
-  var targets = (opts || {}).targets || this.peers;
+  var targets = (opts || {}).targets;
   var label = (opts || {}).label || 'primary';
   var m = this;
 
-  // iterate through the targets, create the negotiation streams as required
-  targets.forEach(function(targetId) {
+  function createBroadcast(targetId) {
     // request a datastream to the target
-    m.to(targetId, { type: 'broadcast' }, function(err, ds) {
+    m.to(targetId, { type: 'broadcast', label: label }, function(err, ds) {
       var broadcastKey = targetId + ':' + label;
       var bc = m._broadcasts[broadcastKey];
 
@@ -183,6 +182,19 @@ proto.broadcast = function(streams, opts) {
       // this will trigger the offer sequence
       bc.streams = [].concat(streams || []);
     });
+  }
+
+  // iterate through the targets, create the negotiation streams as required
+  (targets || this.peers).forEach(createBroadcast);
+
+  // if we get a new peer broadcast to them also
+  this.on('peer:announce', function(data) {
+    var validTarget = (targets || m.peers).indexOf(data.id) >= 0;
+
+    debug('new peer joined: ', data.id);
+    if (validTarget) {
+      createBroadcast(data.id);
+    }
   });
 };
 
@@ -603,10 +615,31 @@ proto._initPeerConnection = function(targetId, peerData) {
   receiver.
 
 **/
-proto._monitorIncomingBroadcasts = function(targetId, ds, metadata) {
-  if (metadata && metadata.type == 'broadcast') {
-    console.log('found incoming broadcast from target: ' + targetId);
+proto._monitorIncomingBroadcasts = function(srcId, ds, metadata) {
+  var m = this;
+  var isBroadcast = metadata && metadata.type == 'broadcast';
+
+  if (! isBroadcast) {
+    return;
   }
+
+  // initialise the config based on the member config
+  var config = defaults({}, this.opts.config, {
+    iceServers: []
+  });
+
+  // create a new peer connection
+  var pc = new RTCPeerConnection(config);
+
+  // receive the stream
+  Broadcast.receive(pc, ds, this.opts, function(err, streams) {
+    if (err) {
+      return debug('received a stream, but encountered an error', err);
+    }
+
+    debug('received a broadcast from ' + srcId + ', streams: ', streams);
+    m.emit('broadcast', srcId, streams, metadata);
+  })
 };
 
 /**
