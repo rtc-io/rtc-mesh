@@ -8,6 +8,7 @@ mesh to be created and kept in sync (using
 
 [![NPM](https://nodei.co/npm/rtc-mesh.png)](https://nodei.co/npm/rtc-mesh/)
 
+[![Build Status](https://travis-ci.org/rtc-io/rtc-mesh.png?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh)
 
 ## How it works
 
@@ -35,7 +36,7 @@ mesh.join('meshdemo-simple', function(err, m) {
     return console.error('could not connect: ', err);
   }
 
-  m.on('data:update', function(key, value) {
+  m.data.on('change', function(key, value) {
     console.log('key: ' + key + ', set to: ', value);
   });
 
@@ -80,6 +81,16 @@ following code:
 mesh.use('http://rtc.io/switchboard/');
 ```
 
+### Broadcast(label, src)
+
+#### _answer(pc, data)
+
+#### _candidates(pc, data)
+
+#### _createOffer()
+
+Initiate the createOffer cycle on the peer connection
+
 ### RTCMeshMember(attributes, opts)
 
 An `RTCMeshMember` instance is returned when you successfully join
@@ -94,6 +105,11 @@ Announce ourselves to the global signaller.  If you used the `join` function
 exported by `rtc-mesh` then this is called for you automatically.  You can,
 however, call the method again if you wish to update any of your signalling
 specific data requires updating.
+
+#### broadcast(streams, opts)
+
+Broadcast one or more streams to all active peers within the mesh or to
+specified targets within the `opts`.
 
 #### close()
 
@@ -151,6 +167,12 @@ communicating with the target.
 Create a new `RTCPeerConnection` for the specified target id.  This method
 also handles basic initialization of the peer connection.
 
+#### _monitorIncomingBroadcasts
+
+This method responds to incoming datastream events and checks to see
+if it is a negotiate type stream. If so we need to create a broadcast
+receiver.
+
 #### _negotiate(targetId, pc, negotiateFn)
 
 Used to handle the `createOffer` or `createAnswer` interaction.
@@ -166,7 +188,7 @@ synchronization.
 
 ### Apache 2.0
 
-Copyright 2013 National ICT Australia Limited (NICTA)
+Copyright 2014 National ICT Australia Limited (NICTA)
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
