@@ -34,13 +34,13 @@
     "through": "~2.3.4"
   },
   "devDependencies": {
-    "tape": "~2.4.2",
+    "tape": "~2.5.0",
     "rtc-switchboard": "~0.7.2",
     "uuid": "~1.4.1",
     "zuul": "~1.5.4",
     "crel": "~1.1.1",
     "drag-and-drop-files": "0.0.1",
-    "filestream": "~0.4.0",
+    "filestream": "~0.5.3",
     "rtc-media": "~1.5.3"
   }
 }
