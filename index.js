@@ -1,106 +1,63 @@
 /* jshint node: true */
-/* global location: false */
 'use strict';
 
-var defaults = require('./defaults');
-var extend = require('cog/extend');
-var RTCMeshMember = require('./member');
+var debug = require('cog/logger')('rtc-mesh');
+var dcstream = require('rtc-dcstream');
+var Model = require('scuttlebutt/model');
 
 /**
   # rtc-mesh
 
-  The `rtc-mesh` module provides functionality that will enable P2P data
-  mesh to be created and kept in sync (using
-  [scuttlebutt](https://github.com/dominictarr/scuttlebutt)).
+  __NOTE:__ From version `0.5` onwards `rtc-mesh` is now an
+  [rtc-quickconnect](https://github.com/rtc-io/rtc-quickconnect) plugin
+  (which is heaps better and cleaner).
 
-  ## How it works
+  The `rtc-mesh` module provides a way of sharing data between clients using
+  [scuttlebutt](https://github.com/dominictarr/scuttlebutt).
 
-  The `rtc-mesh` module works by setting up a data-only WebRTC peer connection
-  as peers are discovered in a particular room
-  (using [rtc-signaller](https://github.com/rtc-io/rtc-signaller)).  A node
-  compatible stream is then wrapped around the stream and we use
-  [scuttlebutt](https://github.com/dominictarr/scuttlebutt) to keep data in
-  sync with other peers via the data channel.
-
-  ## Example Usage
-
-  Below is a simple example showing how you can join a mesh, and update the
-  shared data of the mesh:
+  ## Simple Example
 
   <<< examples/simple.js
 
-  ## Firefox to Chrome Interop
-
-  Tested Chrome 32 <==> Firefox 26 and it works nicely :)
-
-  ## Reference
-
 **/
 
-/**
-  ### join(roomName, opts?, callback)
+module.exports = function(qc, opts) {
+  // create the model
+  var model = (opts || {}).model || new Model();
+  var name = (opts || {}).channel || 'mesh';
+  var channels = {};
 
-  This is a helper factory function for creating a new `RTCMeshMember`
-  instance that will join the specified room for the currently configured
-  signalling server.
+  function joinMesh(dc, id) {
+    // create a new stream
+    var stream = dcstream(dc);
+    var reader = model.createReadStream();
+    var writer = model.createWriteStream();
 
-  ```js
-  require('rtc-mesh').join('testroom', function(err, m) {
-    if (err) {
-      return console.error('error connecting: ', err);
-    }
+    debug('connecting mesh with peer: ' + id);
 
-    console.log('connected to the mesh, id = ' + m.id);
-  });
-  ```
+    // register the channel
+    channels[id] = dc;
 
-**/
-var join = exports.join = function(roomName, opts, callback) {
-  var member;
+    stream.on('error', function(err) {
+      console.warn('captured stream error: ', err.message)
+    });
 
-  // check for no opts
-  if (typeof opts == 'function') {
-    callback = opts;
-    opts = {};
+    // connect the stream to the data
+    reader.pipe(stream).pipe(writer);
+
+    // bubble sync events
+    writer.on('sync', model.emit.bind(model, 'sync'));
   }
 
-  // ensure we have a callback
-  callback = callback || function() {};
+  function leaveMesh(id) {
+    // remove the channel reference
+    channels[id] = null;
+  }
 
-  // create a new member instance
-  member = new RTCMeshMember(extend({}, opts));
+  // create the data channel
+  qc.createDataChannel(name, (opts || {}).channelOpts)
+    .on(name + ':open', joinMesh)
+    .on(name + ':close', leaveMesh);
 
-  // handle errors during connection
-  member.on('error', callback);
-
-  // once the member is online, trigger the callback
-  member.once('online', function() {
-    member.removeListener('error', callback);
-    callback(null, member);
-  });
-
-  // announce
-  member.announce({ room: roomName });
-};
-
-/**
-  ### use(signalhost)
-
-  If you wish to configure a default signalling server to use, then this can
-  be done using the `use` function.  For example if you wanted to use the
-  test rtc.io switchboard for all your connections rather than defaulting to
-  attmepting to use the same origin that your page was served from, use the
-  following code:
-
-  ```js
-  mesh.use('http://rtc.io/switchboard/');
-  ```
-
-**/
-exports.use = function(signalhost) {
-  // update the default signal host
-  defaults.signalhost = signalhost;
-
-  // return exports for chaining
-  return exports;
+  return model;
 };
