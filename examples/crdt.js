@@ -5,7 +5,7 @@ var uuid = require('uuid');
 
 // initialise the connection
 var qc = quickconnect('http://rtc.io/switchboard', {
-  room: 'meshdemo-simple'
+  room: 'meshdemo-crdt'
 });
 
 // create the model
