@@ -27,20 +27,19 @@
   "dependencies": {
     "cog": "~0.5.1",
     "scuttlebutt": "~5.6.8",
-    "rtc-signaller": "~0.18.2",
-    "rtc-core": "~0.7.1",
     "async": "~0.2.9",
     "rtc-dcstream": "~0.4.0",
     "through": "~2.3.4"
   },
   "devDependencies": {
-    "tape": "~2.5.0",
-    "rtc-switchboard": "~0.7.2",
+    "tape": "^2.10.2",
+    "rtc-switchboard": "^0.8.0",
     "uuid": "~1.4.1",
     "zuul": "~1.5.4",
     "crel": "~1.1.1",
     "drag-and-drop-files": "0.0.1",
     "filestream": "~0.5.3",
-    "rtc-media": "~1.5.3"
+    "rtc-media": "~1.5.3",
+    "rtc-quickconnect": "^0.12.0"
   }
 }
