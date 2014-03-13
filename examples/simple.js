@@ -1,19 +1,17 @@
+var quickconnect = require('rtc-quickconnect');
 var mesh = require('../');
 
-// use the demo rtc.io signalling server
-mesh.use('http://rtc.io/switchboard/');
-
-// join the mesh in the friends test room
-mesh.join('meshdemo-simple', function(err, m) {
-  if (err) {
-    return console.error('could not connect: ', err);
-  }
-
-  m.data.on('change', function(key, value) {
-    console.log('key: ' + key + ', set to: ', value);
-  });
-
-  // update the last join time for the shared data
-  m.data.set('lastjoin', Date.now());
+// initialise the connection
+var qc = quickconnect('http://rtc.io/switchboard', {
+  room: 'meshdemo-simple'
 });
 
+// create the model
+var model = mesh(qc);
+
+// report data change events
+model.on('change', function(key, value) {
+  console.log('captured change key: "' + key + '" set to ', value);
+});
+
+model.set('lastjoin', Date.now());
