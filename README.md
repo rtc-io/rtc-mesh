@@ -7,10 +7,10 @@ __NOTE:__ From version `0.5` onwards `rtc-mesh` is now an
 The `rtc-mesh` module provides a way of sharing data between clients using
 [scuttlebutt](https://github.com/dominictarr/scuttlebutt).
 
-![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)
 
 [![NPM](https://nodei.co/npm/rtc-mesh.png)](https://nodei.co/npm/rtc-mesh/)
 
+![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)
 [![Build Status](https://img.shields.io/travis/rtc-io/rtc-mesh.svg?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh)
 
 ## Simple Example
