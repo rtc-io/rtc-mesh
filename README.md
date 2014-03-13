@@ -35,6 +35,64 @@ model.on('change', function(key, value) {
 model.set('lastjoin', Date.now());
 ```
 
+## Using Scuttlebutt Subclasses
+
+Here's an example using
+[CRDT](https://github.com/dominictarr/crdt):
+
+```js
+var quickconnect = require('rtc-quickconnect');
+var mesh = require('rtc-mesh');
+var Doc = require('crdt').Doc;
+var uuid = require('uuid');
+
+// initialise the connection
+var qc = quickconnect('http://rtc.io/switchboard', {
+  room: 'meshdemo-crdt'
+});
+
+// create the model
+var model = mesh(qc, { model: new Doc() });
+
+model.on('add', function(row) {
+  console.log('new row created: ', row);
+});
+
+model.add({ id: uuid.v4(), name: 'Fred' });
+```
+
+## Synchronizing Multiple Datasets
+
+It's also possible to create invoke multiple meshes on a single data
+channel using custom channel names (by default the a channel is created with
+the name of `mesh`).
+
+```js
+var quickconnect = require('rtc-quickconnect');
+var mesh = require('rtc-mesh');
+
+// initialise the connection
+var qc = quickconnect('http://rtc.io/switchboard', {
+  room: 'meshdemo-multichannel'
+});
+
+// create the model
+var modelA = mesh(qc, { channelName: 'm1' });
+var modelB = mesh(qc, { channelName: 'm2' });
+
+// report data change events
+modelA.on('change', function(key, value) {
+  console.log('captured change for item in a: ', arguments);
+});
+
+modelB.on('change', function(key, value) {
+  console.log('captured change for item in b: ', arguments);
+})
+
+modelA.set('lastjoin', Date.now());
+modelB.set('lastRandom', (Math.random() * 10000) | 0);
+```
+
 ## License(s)
 
 ### Apache 2.0
