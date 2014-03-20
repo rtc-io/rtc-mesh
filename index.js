@@ -57,6 +57,14 @@ module.exports = function(qc, opts) {
       console.warn('captured stream error: ', err.message)
     });
 
+    reader.on('error', function(err) {
+      console.warn('captured reader stream error: ', err.message);
+    });
+
+    writer.on('error', function(err) {
+      console.warn('captured writer stream error: ', err.message);
+    });
+
     // connect the stream to the data
     reader.pipe(stream).pipe(writer);
 
