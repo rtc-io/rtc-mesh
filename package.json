@@ -27,7 +27,7 @@
   "dependencies": {
     "cog": "~0.5.1",
     "scuttlebutt": "~5.6.8",
-    "async": "~0.2.9",
+    "async": "^0.7.0",
     "rtc-dcstream": "~0.4.0",
     "through": "~2.3.4"
   },
