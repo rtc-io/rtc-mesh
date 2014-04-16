@@ -42,7 +42,7 @@ module.exports = function(qc, opts) {
   var name = (opts || {}).channelName || 'mesh';
   var channels = {};
 
-  function joinMesh(dc, id) {
+  function joinMesh(id, dc) {
     // create a new stream
     var stream = dcstream(dc);
     var reader = model.createReadStream();
@@ -72,6 +72,10 @@ module.exports = function(qc, opts) {
     writer.on('sync', model.emit.bind(model, 'sync'));
   }
 
+  function joinMeshDeprecated(dc, id) {
+    joinMesh(id, dc);
+  }
+
   function leaveMesh(id) {
     // remove the channel reference
     channels[id] = null;
@@ -79,8 +83,10 @@ module.exports = function(qc, opts) {
 
   // create the data channel
   qc.createDataChannel(name, (opts || {}).channelOpts)
-    .on(name + ':open', joinMesh)
-    .on(name + ':close', leaveMesh);
+    .on(name + ':open', joinMeshDeprecated)
+    .on('channel:opened:' + name, joinMesh)
+    .on(name + ':close', leaveMesh)
+    .on('channel:closed:' + name, leaveMesh);
 
   return model;
 };
