@@ -76,7 +76,7 @@ var qc = quickconnect('http://rtc.io/switchboard', {
   room: 'meshdemo-multichannel'
 });
 
-// create the model
+// create the models
 var modelA = mesh(qc, { channelName: 'm1' });
 var modelB = mesh(qc, { channelName: 'm2' });
 
@@ -89,9 +89,38 @@ modelB.on('change', function(key, value) {
   console.log('captured change for item in b: ', arguments);
 })
 
+// update some keys
 modelA.set('lastjoin', Date.now());
 modelB.set('lastRandom', (Math.random() * 10000) | 0);
 ```
+
+## Reference
+
+### mesh
+
+```
+mesh(qc, opts?) => Model
+```
+
+As displayed in the examples, the `mesh` function expects to be passed a
+[quickconnect](https://github.com/rtc-io/rtc-quickconnect) created signaller. Using
+this object, it will create a data channel that will be responsible for sharing
+[scuttlebutt](https://github.com/dominictarr/scuttlebutt) model information with peers.
+
+In addition to the functions exposed by a scuttlebutt Model, the following helpers
+have also been added:
+
+#### retrieve
+
+```
+retrieve(key, callback)
+```
+
+Get the value of the specified key and pass the result back through the
+provided `callback` (node error first style).  If the value is already
+available in the local Model, then the callback will be triggered immediately.
+If not, the callback will be triggered once the value has been set in the
+local Model.
 
 ## License(s)
 
