@@ -34,8 +34,26 @@ var Model = require('scuttlebutt/model');
 
   <<< examples/multichannel.js
 
+  ## Reference
+
 **/
 
+/**
+  ### mesh
+
+  ```
+  mesh(qc, opts?) => Model
+  ```
+
+  As displayed in the examples, the `mesh` function expects to be passed a
+  [quickconnect](https://github.com/rtc-io/rtc-quickconnect) created signaller. Using
+  this object, it will create a data channel that will be responsible for sharing
+  [scuttlebutt](https://github.com/dominictarr/scuttlebutt) model information with peers.
+
+  In addition to the functions exposed by a scuttlebutt Model, the following helpers
+  have also been added:
+
+**/
 module.exports = function(qc, opts) {
   // create the model
   var model = (opts || {}).model || new Model();
@@ -80,6 +98,34 @@ module.exports = function(qc, opts) {
     // remove the channel reference
     channels[id] = null;
   }
+
+  /**
+    #### retrieve
+
+    ```
+    retrieve(key, callback)
+    ```
+
+    Get the value of the specified key and pass the result back through the
+    provided `callback` (node error first style).  If the value is already
+    available in the local Model, then the callback will be triggered immediately.
+    If not, the callback will be triggered once the value has been set in the
+    local Model.
+  **/
+  function retrieve(key, callback) {
+    var value = model.get(key);
+
+    // if we have the value, then trigger the callback immediately
+    if (typeof value != 'undefined') {
+      return callback(null, value);
+    }
+
+    // otherwise, wait for the value
+    model.once('change:' + key, callback.bind(model, null));
+  }
+
+  // patch in the retrieveValue function
+  model.retrieve = retrieve;
 
   // create the data channel
   qc.createDataChannel(name, (opts || {}).channelOpts)
