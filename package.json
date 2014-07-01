@@ -32,15 +32,15 @@
     "through": "~2.3.4"
   },
   "devDependencies": {
-    "tape": "^2.10.2",
-    "rtc-switchboard": "^0.10.1",
-    "uuid": "^1.4.1",
-    "zuul": "^1.6.3",
+    "crdt": "^3",
     "crel": "~1.1.1",
     "drag-and-drop-files": "0.0.1",
     "filestream": "~0.5.3",
     "rtc-media": "^1",
-    "rtc-quickconnect": "^1",
-    "crdt": "^3"
+    "rtc-quickconnect": "^2.2.0",
+    "rtc-switchboard": "^0.10.1",
+    "tape": "^2.10.2",
+    "uuid": "^1.4.1",
+    "zuul": "^1.6.3"
   }
 }
