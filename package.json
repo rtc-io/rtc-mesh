@@ -25,7 +25,7 @@
   },
   "homepage": "https://github.com/rtc-io/rtc-mesh",
   "dependencies": {
-    "async": "^0.7.0",
+    "async": "^0.9.0",
     "cog": "^1.0.0",
     "rtc-dcstream": "~0.4.0",
     "scuttlebutt": "~5.6.8",
