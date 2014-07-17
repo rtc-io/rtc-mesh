@@ -35,7 +35,7 @@
     "crdt": "^3",
     "crel": "~1.1.1",
     "drag-and-drop-files": "0.0.1",
-    "filestream": "~0.5.3",
+    "filestream": "^1.0.1",
     "rtc-media": "^1",
     "rtc-quickconnect": "^2.2.0",
     "rtc-switchboard": "^0.10.1",
