@@ -10,8 +10,7 @@ The `rtc-mesh` module provides a way of sharing data between clients using
 
 [![NPM](https://nodei.co/npm/rtc-mesh.png)](https://nodei.co/npm/rtc-mesh/)
 
-![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)
-[![Build Status](https://img.shields.io/travis/rtc-io/rtc-mesh.svg?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh)
+[![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)](https://github.com/dominictarr/stability#unstable) [![Build Status](https://img.shields.io/travis/rtc-io/rtc-mesh.svg?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh) 
 
 ## Simple Example
 
@@ -37,7 +36,10 @@ model.set('lastjoin', Date.now());
 
 ## Using Scuttlebutt Subclasses
 
-Here's an example using
+In the case that you would like to use one of the
+[Scuttlebutt subclasses](https://github.com/dominictarr/scuttlebutt#subclasses),
+this can be done quite easily be providing a model instance in the `model`
+option in the `opts` argument. Here's an example using
 [CRDT](https://github.com/dominictarr/crdt):
 
 ```js
