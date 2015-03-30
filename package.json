@@ -4,7 +4,7 @@
   "description": "A synchronized, distributed P2P mesh data structure using WebRTC data channels",
   "main": "index.js",
   "scripts": {
-    "test": "$(npm bin)/zuul -- test/all.js",
+    "test": "browserify test/all.js | broth start-$BROWSER | tap-spec",
     "gendocs": "gendocs > README.md"
   },
   "repository": {
@@ -32,12 +32,15 @@
     "through": "~2.3.4"
   },
   "devDependencies": {
+    "broth": "^1.2.1",
+    "browserify": "^9.0.3",
     "crdt": "^3",
     "crel": "^2.1.8",
     "rtc-quickconnect": "^4.2.1",
     "rtc-switchboard": "^2.2.1",
+    "tap-spec": "^2.2.2",
     "tape": "^3.5.0",
-    "uuid": "^2.0.1",
-    "zuul": "^1.6.3"
+    "travis-multirunner": "^2.1.0",
+    "uuid": "^2.0.1"
   }
 }
