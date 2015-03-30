@@ -34,9 +34,6 @@
   "devDependencies": {
     "crdt": "^3",
     "crel": "^2.1.8",
-    "drag-and-drop-files": "0.0.1",
-    "filestream": "^3.0.2",
-    "rtc-media": "^2.0.1",
     "rtc-quickconnect": "^4.2.1",
     "rtc-switchboard": "^2.2.1",
     "tape": "^3.5.0",
