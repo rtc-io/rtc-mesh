@@ -4,7 +4,7 @@ var Doc = require('crdt').Doc;
 var uuid = require('uuid');
 
 // initialise the connection
-var qc = quickconnect('http://rtc.io/switchboard', {
+var qc = quickconnect('https://switchboard.rtc.io/', {
   room: 'meshdemo-crdt'
 });
 

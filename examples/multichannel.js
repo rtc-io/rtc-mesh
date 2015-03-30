@@ -2,7 +2,7 @@ var quickconnect = require('rtc-quickconnect');
 var mesh = require('../');
 
 // initialise the connection
-var qc = quickconnect('http://rtc.io/switchboard', {
+var qc = quickconnect('https://switchboard.rtc.io/', {
   room: 'meshdemo-multichannel'
 });
 
