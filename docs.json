@@ -2,7 +2,9 @@
   "badges": {
     "nodeico": true,
     "stability": "unstable",
-    "travis": true
+    "travis": true,
+    "bithound": true,
+    "gitter": "rtc-io/discuss"
   },
 
   "license": {

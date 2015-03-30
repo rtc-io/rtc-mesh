@@ -10,7 +10,10 @@ The `rtc-mesh` module provides a way of sharing data between clients using
 
 [![NPM](https://nodei.co/npm/rtc-mesh.png)](https://nodei.co/npm/rtc-mesh/)
 
-[![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)](https://github.com/dominictarr/stability#unstable) [![Build Status](https://img.shields.io/travis/rtc-io/rtc-mesh.svg?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh) 
+[![unstable](https://img.shields.io/badge/stability-unstable-yellowgreen.svg)](https://github.com/dominictarr/stability#unstable) [![Build Status](https://img.shields.io/travis/rtc-io/rtc-mesh.svg?branch=master)](https://travis-ci.org/rtc-io/rtc-mesh) [![bitHound Score](https://www.bithound.io/github/rtc-io/rtc-mesh/badges/score.svg)](https://www.bithound.io/github/rtc-io/rtc-mesh) 
+[![Gitter chat](https://badges.gitter.im/rtc-io/discuss.png)](https://gitter.im/rtc-io/discuss)
+
+
 
 ## Simple Example
 
@@ -19,7 +22,7 @@ var quickconnect = require('rtc-quickconnect');
 var mesh = require('rtc-mesh');
 
 // initialise the connection
-var qc = quickconnect('http://rtc.io/switchboard', {
+var qc = quickconnect('https://switchboard.rtc.io/', {
   room: 'meshdemo-simple'
 });
 
@@ -32,6 +35,7 @@ model.on('change', function(key, value) {
 });
 
 model.set('lastjoin', Date.now());
+
 ```
 
 ## Using Scuttlebutt Subclasses
@@ -49,7 +53,7 @@ var Doc = require('crdt').Doc;
 var uuid = require('uuid');
 
 // initialise the connection
-var qc = quickconnect('http://rtc.io/switchboard', {
+var qc = quickconnect('https://switchboard.rtc.io/', {
   room: 'meshdemo-crdt'
 });
 
@@ -61,6 +65,7 @@ model.on('add', function(row) {
 });
 
 model.add({ id: uuid.v4(), name: 'Fred' });
+
 ```
 
 ## Synchronizing Multiple Datasets
@@ -74,7 +79,7 @@ var quickconnect = require('rtc-quickconnect');
 var mesh = require('rtc-mesh');
 
 // initialise the connection
-var qc = quickconnect('http://rtc.io/switchboard', {
+var qc = quickconnect('https://switchboard.rtc.io/', {
   room: 'meshdemo-multichannel'
 });
 
@@ -94,6 +99,7 @@ modelB.on('change', function(key, value) {
 // update some keys
 modelA.set('lastjoin', Date.now());
 modelB.set('lastRandom', (Math.random() * 10000) | 0);
+
 ```
 
 ## Reference
@@ -128,7 +134,7 @@ local Model.
 
 ### Apache 2.0
 
-Copyright 2014 National ICT Australia Limited (NICTA)
+Copyright 2015 National ICT Australia Limited (NICTA)
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
