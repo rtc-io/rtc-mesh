@@ -1,11 +1,32 @@
+sudo: false
 language: node_js
 node_js:
-- 0.1
+- 0.10
+
+env:
+  matrix:
+    - BROWSER=chrome  BVER=stable
+    - BROWSER=chrome  BVER=beta
+    - BROWSER=chrome  BVER=unstable
+    - BROWSER=firefox BVER=stable
+    - BROWSER=firefox BVER=beta
+    - BROWSER=firefox BVER=unstable
+
+matrix:
+  fast_finish: true
+
+  allow_failures:
+    - env: BROWSER=chrome  BVER=unstable
+    - env: BROWSER=firefox BVER=unstable
+
+before_script:
+  - ./node_modules/travis-multirunner/setup.sh
+  - export DISPLAY=:99.0
+  - sh -e /etc/init.d/xvfb start
+
+after_failure:
+  - for file in *.log; do echo $file; echo "======================"; cat $file; done || true
+
 notifications:
   email:
   - damon.oehlman@nicta.com.au
-  irc: irc.freenode.org#rtc.io
-env:
-  global:
-  - secure: hyVM+eKaWOvjyMUJi0L/OFf7rZWTOr2Uh+MmIQ7EijP+fCNvh9+v6FsMUJxUEJN/jnrZllujxTGV+n8u/9RIi5xy3KGpptVUzAaZqMjfmn5uBrPctmpNJ8oCnAkMkfepgfvi3Dia1U2IBNurcczj5VNG4n2MZYXIFI7wytD7hsU=
-  - secure: Fv4VHXYg3Ctbb864/eO1em6OGRw9mCJoS+WC89Z9g4+FDxjNdI/3+NFDKY53HCxTLq7CtAbDC/P5aDHfvqGM3ix6hB3k4kQOuRt60SAxgXggQ6iJrK1LtyHC4oHgrsA6yBsWnN3guNP1NJhAAQgdatAzccKjElxeyWsOOv/IJ04=
