@@ -32,7 +32,7 @@
     "through": "~2.3.4"
   },
   "devDependencies": {
-    "broth": "^1.2.1",
+    "broth": "^2.0.0",
     "browserify": "^9.0.3",
     "crdt": "^3",
     "crel": "^2.1.8",
